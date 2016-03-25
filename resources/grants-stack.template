@@ -1,0 +1,98 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "grants": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "Name",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "valid_to",
+            "AttributeType": "N"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "Name",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "valid_to",
+            "KeyType" : "RANGE"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "pubkeys": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "kid",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "kid",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "2",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "LambdaExecRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      }
+    },
+    "ReadJWTPubkeys": {
+      "Type": "AWS::IAM::Policy",
+      "Properties" : {
+        "PolicyName" : "ReadJWTPubkeys",
+        "PolicyDocument" : {
+            "Id" : "S3BucketPolicy",
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                  "Sid": "ReadJWTPubkeys",
+                  "Effect": "Allow",
+                  "Action": "dynamodb:GetItem",
+                  "Resource" : { "Fn::Join" :  [ "", [ "arn:aws:dynamodb:", { "Ref" : "AWS::Region" }, ":", { "Ref" : "AWS::AccountId" } ,":table/", { "Ref" : "pubkeys" } ] ]}
+                }
+            ]
+        },
+        "Roles" : [ { "Ref" : "LambdaExecRole" }]
+      },
+      "DependsOn": "pubkeys"
+    }
+  },
+  "Outputs": {
+    "pubkeysTablename": {
+      "Description": "Table name for pubkeys",
+      "Value": { "Ref" : "pubkeys"}
+    },
+
+}
