@@ -4,6 +4,7 @@
     "grants": {
       "Type": "AWS::DynamoDB::Table",
       "Properties": {
+        "TableName" : { "Fn::Join" :  [ "-", [ { "Ref" : "AWS::StackName" }, "grants" ] ] },
         "AttributeDefinitions": [
           {
             "AttributeName": "Name",
@@ -33,6 +34,7 @@
     "pubkeys": {
       "Type": "AWS::DynamoDB::Table",
       "Properties": {
+        "TableName" : { "Fn::Join" :  [ "-", [ { "Ref" : "AWS::StackName" }, "pubkeys" ] ] },
         "AttributeDefinitions": [
           {
             "AttributeName": "kid",
@@ -54,6 +56,7 @@
     "LambdaExecRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
+        "ManagedPolicyArns" : [ { "Ref" : "ReadJWTPubkeys" }],
         "AssumeRolePolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
@@ -68,12 +71,34 @@
         }
       }
     },
-    "ReadJWTPubkeys": {
+    "LogWriterPolicy": {
       "Type": "AWS::IAM::Policy",
       "Properties" : {
-        "PolicyName" : "ReadJWTPubkeys",
+        "PolicyName" : "LogWriterPolicy",
         "PolicyDocument" : {
-            "Id" : "S3BucketPolicy",
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogGroup",
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:*:*:*"
+              }
+            ]
+        },
+        "Roles" : [ { "Ref" : "LambdaExecRole" } ]
+      },
+      "DependsOn" : "LambdaExecRole"
+    },
+    "ReadJWTPubkeys": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties" : {
+        "Description" : "ReadJWTPubkeys",
+        "PolicyDocument" : {
+            "Id" : "ReadJWTPubkeys",
             "Version": "2012-10-17",
             "Statement": [
                 {
@@ -83,16 +108,54 @@
                   "Resource" : { "Fn::Join" :  [ "", [ "arn:aws:dynamodb:", { "Ref" : "AWS::Region" }, ":", { "Ref" : "AWS::AccountId" } ,":table/", { "Ref" : "pubkeys" } ] ]}
                 }
             ]
-        },
-        "Roles" : [ { "Ref" : "LambdaExecRole" }]
+        }
       },
       "DependsOn": "pubkeys"
+    },
+    "WriteJWTPubkeys": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties" : {
+        "Description" : "ReadJWTPubkeys",
+        "PolicyDocument" : {
+            "Id" : "WriteJWTPubkeys",
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                  "Sid": "WriteJWTPubkeys",
+                  "Effect": "Allow",
+                  "Action": "dynamodb:PutItem",
+                  "Resource" : { "Fn::Join" :  [ "", [ "arn:aws:dynamodb:", { "Ref" : "AWS::Region" }, ":", { "Ref" : "AWS::AccountId" } ,":table/", { "Ref" : "pubkeys" } ] ]}
+                }
+            ]
+        }
+      },
+      "DependsOn": "pubkeys"
+    },
+    "ReadGrants" : {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties" : {
+        "Description" : "ReadGrants",
+        "PolicyDocument" : {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "ReadGrants",
+              "Effect": "Allow",
+              "Action": [
+                  "dynamodb:Scan"
+              ],
+              "Resource": { "Fn::Join" :  [ "", [ "arn:aws:dynamodb:", { "Ref" : "AWS::Region" }, ":", { "Ref" : "AWS::AccountId" } ,":table/", { "Ref" : "grants" } ] ]}
+            }
+          ]
+        }
+      },
+      "DependsOn": "grants"
     }
   },
   "Outputs": {
     "pubkeysTablename": {
       "Description": "Table name for pubkeys",
       "Value": { "Ref" : "pubkeys"}
-    },
-
+    }
+  }
 }
