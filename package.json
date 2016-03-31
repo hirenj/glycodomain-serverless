@@ -7,9 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "lambda-jwt" : "0.1.0",
-    "lambda-syncgroups" : "0.0.1",
-    "lambda-gatordata" : "0.0.1"
+    "lambda-jwt": "0.1.0",
+    "lambda-syncgroups": "0.0.1",
+    "lambda-gatordata": "0.0.1"
   },
   "repository": {
     "type": "git",
@@ -20,5 +20,9 @@
   "bugs": {
     "url": "https://github.com/hirenj/glycodomain-serverless/issues"
   },
-  "homepage": "https://github.com/hirenj/glycodomain-serverless"
+  "homepage": "https://github.com/hirenj/glycodomain-serverless",
+  "devDependencies": {
+    "grunt": "^0.4.5",
+    "load-grunt-tasks": "^3.4.1"
+  }
 }
