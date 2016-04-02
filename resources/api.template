@@ -8,7 +8,32 @@
     }
   },
   "Resources": {
-
+    "dataApi" : {
+        "Type" : "Custom::RestApi",
+        "Properties" : {
+            "ServiceToken": { "Ref": "CFApiGatewayARN" },
+            "name": "Gatordata API",
+            "description": "Gator data API"
+        }
+    },
+    "login" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": {"Ref" : "dataApi" },
+          "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
+          "pathPart": "login",
+          "corsConfiguration": {
+              "allowMethods": ["GET"],
+              "allowHeaders": [],
+              "allowDefaultHeaders": true,
+              "allowOrigin": "*",
+              "exposeHeaders": [],
+              "maxAge": 1800,
+              "allowCredentials": false
+           }
+      }
+    }
   },
   "Outputs": {
   }
