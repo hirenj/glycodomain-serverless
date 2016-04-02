@@ -1,0 +1,15 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters" : {
+    "CFApiGatewayARN" : {
+      "Type" : "String",
+      "Default" : "",
+      "Description" : "Enter ARN for API gateway lambda"
+    }
+  },
+  "Resources": {
+
+  },
+  "Outputs": {
+  }
+}
