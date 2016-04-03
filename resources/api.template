@@ -5,6 +5,14 @@
       "Type" : "String",
       "Default" : "",
       "Description" : "Enter ARN for API gateway lambda"
+    },
+    "datahandler" : {
+      "Type" : "String",
+      "Description" : "Enter function name for dataHandler function"
+    },
+    "loginhandler" : {
+      "Type" : "String",
+      "Description" : "Enter function name for loginhandler function"
     }
   },
   "Resources": {
@@ -20,7 +28,7 @@
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
-          "restApiId": {"Ref" : "dataApi" },
+          "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
           "pathPart": "login",
           "corsConfiguration": {
@@ -38,7 +46,7 @@
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
-          "restApiId": {"Ref" : "dataApi" },
+          "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
           "pathPart": "exchangetoken"
       }
@@ -47,7 +55,7 @@
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
-          "restApiId": {"Ref" : "dataApi" },
+          "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
           "pathPart": "data"
       }
@@ -56,7 +64,7 @@
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
-          "restApiId": {"Ref" : "dataApi" },
+          "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Ref" : "dataApiData" },
           "pathPart": "latest"
       }
@@ -65,7 +73,7 @@
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
-          "restApiId": {"Ref" : "dataApi" },
+          "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Ref" : "dataApiLatest" },
           "pathPart": "{dataset}"
       }
@@ -74,9 +82,33 @@
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
-          "restApiId": {"Ref" : "dataApi" },
+          "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Ref" : "dataApiDataset" },
           "pathPart": "{acc}"
+      }
+    },
+    "authJwt" : {
+      "Type" : "Custom::ApiAuthorizer",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": { "Ref" : "dataApi" },
+          "authorizerUri": { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "loginhandler" }, "/invocations" ] ]},
+          "identitySource": "method.request.header.Authorization",
+          "name": "authJwt",
+          "authorizerResultTtlInSeconds": 300,
+          "identityValidationExpression": "Bearer [^\\.]+\\.[^\\.]+\\.[^\\.]+"
+      }
+    },
+    "authJwtData" : {
+      "Type" : "Custom::ApiAuthorizer",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": { "Ref" : "dataApi" },
+          "authorizerUri": { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "datahandler" }, "/invocations" ] ]},
+          "identitySource": "method.request.header.Authorization",
+          "name": "authJwtData",
+          "authorizerResultTtlInSeconds": 0,
+          "identityValidationExpression": "Bearer [^\\.]+\\.[^\\.]+\\.[^\\.]+"
       }
     }
   },
