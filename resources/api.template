@@ -16,7 +16,7 @@
             "description": "Gator data API"
         }
     },
-    "login" : {
+    "dataApiLogin" : {
       "Type" : "Custom::ApiResource",
       "Properties" : {
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
@@ -32,6 +32,51 @@
               "maxAge": 1800,
               "allowCredentials": false
            }
+      }
+    },
+    "dataApiExchangetoken" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": {"Ref" : "dataApi" },
+          "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
+          "pathPart": "exchangetoken"
+      }
+    },
+    "dataApiData" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": {"Ref" : "dataApi" },
+          "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
+          "pathPart": "data"
+      }
+    },
+    "dataApiLatest" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": {"Ref" : "dataApi" },
+          "parentId": { "Ref" : "dataApiData" },
+          "pathPart": "latest"
+      }
+    },
+    "dataApiDataset" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": {"Ref" : "dataApi" },
+          "parentId": { "Ref" : "dataApiLatest" },
+          "pathPart": "{dataset}"
+      }
+    },
+    "dataApiAcc" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": {"Ref" : "dataApi" },
+          "parentId": { "Ref" : "dataApiDataset" },
+          "pathPart": "{acc}"
       }
     }
   },
