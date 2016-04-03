@@ -13,6 +13,10 @@
     "loginhandler" : {
       "Type" : "String",
       "Description" : "Enter function name for loginhandler function"
+    },
+    "exchangetoken" : {
+      "Type" : "String",
+      "Description" : "Enter function name for exchangetoken function"
     }
   },
   "Resources": {
@@ -41,6 +45,29 @@
               "allowCredentials": false
            }
       }
+    },
+    "dataApiLoginGET" : {
+        "Type" : "Custom::ApiMethod",
+        "Properties" : {
+            "ServiceToken": { "Ref": "CFApiGatewayARN" },
+            "restApiId": { "Ref" : "dataApi" },
+            "resourceId": { "Ref" : "dataApiLogin" },
+            "method": {
+                "authorizationType": "NONE",
+                "httpMethod": "GET"
+            },
+            "integration": {
+                "type": "AWS",
+                "httpMethod" : "POST",
+                "credentials" : { "Fn::Join" : ["",["arn:aws:iam::",{ "Ref" : "AWS::AccountId" },":role/test-LambdaExchangetokenRole-1CS98XZ1X1ETJ"]]},
+                "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" }, "/invocations" ] ]}
+            },
+            "responses": {
+                "default": {
+                    "statusCode": "200"
+                }
+            }
+        }
     },
     "dataApiExchangetoken" : {
       "Type" : "Custom::ApiResource",
