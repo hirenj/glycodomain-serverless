@@ -17,6 +17,14 @@
     "exchangetoken" : {
       "Type" : "String",
       "Description" : "Enter function name for exchangetoken function"
+    },
+    "LambdaReadAllDataRole" : {
+      "Type" : "String",
+      "Description" : "Role name for LambdaReadAllDataRole"
+    },
+    "dataBucket" : {
+      "Type" : "String",
+      "Description" : "Bucket name"
     }
   },
   "Resources": {
@@ -77,7 +85,7 @@
           "pathPart": "exchangetoken"
       }
     },
-    "dataApiLoginPOST" : {
+    "dataApiExchangeTokenPOST" : {
         "Type" : "Custom::ApiMethod",
         "Properties" : {
             "ServiceToken": { "Ref": "CFApiGatewayARN" },
@@ -136,6 +144,35 @@
           "parentId": { "Ref" : "dataApiDataset" },
           "pathPart": "{acc}"
       }
+    },
+    "dataApiAccGET" : {
+        "Type" : "Custom::ApiMethod",
+        "Properties" : {
+            "ServiceToken": { "Ref": "CFApiGatewayARN" },
+            "restApiId": { "Ref" : "dataApi" },
+            "resourceId": { "Ref" : "dataApiAcc" },
+            "method": {
+                "authorizationType": "CUSTOM",
+                "authorizerId" : {"Ref" : "authJwtData"},
+                "httpMethod": "GET",
+                "parameters" : ["header.Authorization","path.dataset","path.acc"]
+            },
+            "integration": {
+                "type": "AWS",
+                "httpMethod" : "GET",
+                "credentials" : {"Fn::Join" : ["",["arn:aws:iam::", { "Ref" : "AWS::AccountId" } ,":role/", {"Ref" : "LambdaReadAllDataRole"} ]]},
+                "requestParameters" : {
+                                        "integration.request.path.dataset" : "method.request.path.dataset",
+                                        "integration.request.path.acc" : "method.request.path.acc"
+                                      },
+                "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":s3:path/",{"Ref" : "dataBucket"},"/data/latest/{dataset}/{acc}" ] ]}
+            },
+            "responses": {
+                "default": {
+                    "statusCode": "200"
+                }
+            }
+        }
     },
     "authJwt" : {
       "Type" : "Custom::ApiAuthorizer",
