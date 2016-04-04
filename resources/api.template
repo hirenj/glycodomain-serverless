@@ -18,6 +18,10 @@
       "Type" : "String",
       "Description" : "Enter function name for exchangetoken function"
     },
+    "readAllData" : {
+      "Type" : "String",
+      "Description" : "Enter function name for readAllData function"
+    },
     "LambdaReadAllDataRole" : {
       "Type" : "String",
       "Description" : "Role name for LambdaReadAllDataRole"
@@ -166,6 +170,48 @@
                                         "integration.request.path.acc" : "method.request.path.acc"
                                       },
                 "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":s3:path/",{"Ref" : "dataBucket"},"/data/latest/{dataset}/{acc}" ] ]}
+            },
+            "responses": {
+                "default": {
+                    "statusCode": "200"
+                }
+            }
+        }
+    },
+    "dataApiCombined" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": { "Ref" : "dataApi" },
+          "parentId": { "Ref" : "dataApiLatest" },
+          "pathPart": "combined"
+      }
+    },
+    "dataApiCombinedAcc" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": { "Ref" : "dataApi" },
+          "parentId": { "Ref" : "dataApiCombined" },
+          "pathPart": "{acc}"
+      }
+    },
+    "dataApiCombinedAccGET" : {
+        "Type" : "Custom::ApiMethod",
+        "Properties" : {
+            "ServiceToken": { "Ref": "CFApiGatewayARN" },
+            "restApiId": { "Ref" : "dataApi" },
+            "resourceId": { "Ref" : "dataApiCombinedAcc" },
+            "method": {
+                "authorizationType": "CUSTOM",
+                "authorizerId" : {"Ref" : "authJwtData"},
+                "httpMethod": "GET",
+                "parameters" : ["header.Authorization","path.acc"]
+            },
+            "integration": {
+                "type": "AWS",
+                "httpMethod" : "POST",
+                "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
             },
             "responses": {
                 "default": {
