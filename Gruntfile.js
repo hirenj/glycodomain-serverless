@@ -7,14 +7,14 @@ var AWS = require('aws-sdk');
 
 AWS.Request.prototype.promise = function() {
   return new Promise(function(accept, reject) {
-    this.on('complete', function(response) {
-      if (response.error) {
-        reject(response.error);
-      } else {
-        accept(response);
-      }
-    });
-    this.send();
+	this.on('complete', function(response) {
+	  if (response.error) {
+		reject(response.error);
+	  } else {
+		accept(response);
+	  }
+	});
+	this.send();
   }.bind(this));
 };
 
@@ -48,9 +48,15 @@ var summarise_resources = function(stack,resources) {
 	var buckets = resources.filter(function(resource) {
 		return resource.ResourceType == 'AWS::S3::Bucket';
 	});
-	var stack_conf = { 	'functions' : make_lookup(lambdas),
+	var queue = resources.filter(function(resource) {
+		return 	resource.ResourceType == 'AWS::SQS::Queue' ||
+				resource.ResourceType == 'AWS::SNS::Topic'
+	});
+	var stack_conf = { 	'stack' : stack,
+						'functions' : make_lookup(lambdas),
 						'tables' : make_lookup(dynamodbs),
-						'buckets' : make_lookup(buckets) };
+						'buckets' : make_lookup(buckets),
+						'queue' : make_lookup(queue) };
 	return stack_conf;
 }
 
@@ -59,6 +65,20 @@ module.exports = function(grunt) {
 
 	var path = require('path');
 	grunt.initConfig({
+		grunt: {
+			deploy_jwt: {
+				gruntfile: 'node_modules/lambda-jwt/Gruntfile.js',
+				task: 'deploy'
+			},
+			deploy_syncgroups: {
+				gruntfile: 'node_modules/lambda-syncgroups/Gruntfile.js',
+				task: 'deploy'
+			},
+			deploy_gatordata: {
+				gruntfile: 'node_modules/lambda-gatordata/Gruntfile.js',
+				task: 'deploy'
+			}
+		}
 	});
 
 	grunt.registerTask('get_resources', 'Get CloudFormation resources', function(stack) {
@@ -68,6 +88,13 @@ module.exports = function(grunt) {
 			var summary = summarise_resources(stack,resources);
 			grunt.file.write(stack+'-resources.conf.json',JSON.stringify(summary,null,'  '));
 			done();
+		});
+	});
+
+	grunt.registerTask('deploy_lambdas', 'Deploy lambdas', function(stack) {
+		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		lambda_modules.forEach(function(module) {
+			grunt.file.copy(stack+'-resources.conf.json',module+'/resources.conf.json');
 		});
 	});
 
