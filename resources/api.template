@@ -58,7 +58,7 @@
               "allowOrigin": "*",
               "exposeHeaders": [],
               "maxAge": 1800,
-              "allowCredentials": false
+              "allowCredentials": true
            }
       }
     },
@@ -271,7 +271,16 @@
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
           "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Ref" : "dataApiCombined" },
-          "pathPart": "{acc}"
+          "pathPart": "{acc}",
+          "corsConfiguration": {
+              "allowMethods": ["GET"],
+              "allowHeaders": [],
+              "allowDefaultHeaders": true,
+              "allowOrigin": "*",
+              "exposeHeaders": [],
+              "maxAge": 1800,
+              "allowCredentials": true
+          }
       }
     },
     "dataApiCombinedAccGET" : {
