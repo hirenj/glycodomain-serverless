@@ -351,7 +351,7 @@
                 "httpMethod" : "POST",
                 "requestTemplates" : {
                     "application/json" : {
-                      "sequences" : "$input.body"
+                      "sequences" : "$util.escapeJavaScript($input.body)"
                     }
                 },
                 "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "clustal" }, "/invocations" ] ]}
