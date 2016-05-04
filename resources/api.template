@@ -122,6 +122,11 @@
             "integration": {
                 "type": "AWS",
                 "httpMethod" : "POST",
+                "requestTemplates" : {
+                    "application/json" : {
+                      "Authorization" : "$input.params().header.get('Authorization')"
+                    }
+                },
                 "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" }, "/invocations" ] ]}
             },
             "responses": {
