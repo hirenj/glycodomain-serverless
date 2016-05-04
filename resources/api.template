@@ -104,7 +104,16 @@
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
           "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
-          "pathPart": "exchangetoken"
+          "pathPart": "exchangetoken",
+          "corsConfiguration": {
+              "allowMethods": ["POST"],
+              "allowHeaders": [],
+              "allowDefaultHeaders": true,
+              "allowOrigin": "*",
+              "exposeHeaders": [],
+              "maxAge": 1800,
+              "allowCredentials": true
+          }
       }
     },
     "dataApiExchangeTokenPOST" : {
@@ -229,7 +238,16 @@
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
           "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Ref" : "dataApiDataset" },
-          "pathPart": "{acc}"
+          "pathPart": "{acc}",
+          "corsConfiguration": {
+              "allowMethods": ["GET"],
+              "allowHeaders": [],
+              "allowDefaultHeaders": true,
+              "allowOrigin": "*",
+              "exposeHeaders": [],
+              "maxAge": 1800,
+              "allowCredentials": true
+          }
       }
     },
     "dataApiAccGET" : {
@@ -347,7 +365,16 @@
           "ServiceToken": { "Ref": "CFApiGatewayARN" },
           "restApiId": { "Ref" : "dataApi" },
           "parentId": { "Ref" : "dataApiTools" },
-          "pathPart": "clustal"
+          "pathPart": "clustal",
+          "corsConfiguration": {
+              "allowMethods": ["POST"],
+              "allowHeaders": [],
+              "allowDefaultHeaders": true,
+              "allowOrigin": "*",
+              "exposeHeaders": [],
+              "maxAge": 1800,
+              "allowCredentials": true
+          }
       }
     },
     "dataApiClustalPOST" : {
