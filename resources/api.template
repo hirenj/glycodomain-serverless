@@ -324,7 +324,8 @@
                 "requestTemplates" : {
                     "application/json" : {
                       "authorizationToken" : "$input.params().header.get('Authorization')",
-                      "acc" : "$input.params('acc')"
+                      "acc" : "$input.params('acc')",
+                      "grants" : "$util.escapeJavaScript($context.authorizer.principalId)"
                     }
                 },
                 "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
