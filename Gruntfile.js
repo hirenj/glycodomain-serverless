@@ -98,6 +98,11 @@ module.exports = function(grunt) {
 		});
 	});
 
+  grunt.registerTask('deploy', 'Retrieve resources and deploy', function(stack) {
+  	grunt.task.run('get_resources:'+stack);
+  	grunt.task.run('deploy_lambdas:'+stack);
+  });
+
 	grunt.registerTask('build_cloudformation', 'Build cloudformation template',function() {
 		var template_paths = ['empty.template'];
 		template_paths = template_paths.concat(grunt.file.expand('node_modules/*/**/resources/*.template'));
