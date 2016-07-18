@@ -8,9 +8,11 @@
   },
   "dependencies": {
     "es6-promise": "^3.1.2",
-    "lambda-gatordata": "0.0.1",
-    "lambda-jwt": "0.1.0",
-    "lambda-syncgroups": "0.0.1"
+    "lambda-gatordata": "hirenj/lambda-gatordata",
+    "lambda-grantauths": "hirenj/lambda-grantauths",
+    "lambda-syncgroups": "hirenj/lambda-syncgroups",
+    "lambda-gatordata": "hirenj/lambda-clustal",
+    "lambda-glycodomain-domains" : "hirenj/lambda-glycodomain-domains"
   },
   "repository": {
     "type": "git",
