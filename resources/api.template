@@ -205,6 +205,81 @@
         },
         "DependsOn" : "dataApi"
     },
+    "dataApiDoi" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": { "Ref" : "dataApi" },
+          "parentId": { "Fn::GetAtt" : ["dataApi", "parentResourceId"] },
+          "pathPart": "doi"
+      }
+    },
+    "dataApiDoiDoi" : {
+      "Type" : "Custom::ApiResource",
+      "Properties" : {
+          "ServiceToken": { "Ref": "CFApiGatewayARN" },
+          "restApiId": { "Ref" : "dataApi" },
+          "parentId": { "Ref" : "dataApiDoi" },
+          "pathPart": "{doi}",
+          "corsConfiguration": {
+              "allowMethods": ["GET"],
+              "allowHeaders": [],
+              "allowDefaultHeaders": true,
+              "allowOrigin": "*",
+              "exposeHeaders": [],
+              "maxAge": 1800,
+              "allowCredentials": true
+          }
+      }
+    },
+    "dataApiDoiDoiGET" : {
+        "Type" : "Custom::ApiMethod",
+        "Properties" : {
+            "ServiceToken": { "Ref": "CFApiGatewayARN" },
+            "restApiId": { "Ref" : "dataApi" },
+            "resourceId": { "Ref" : "dataApiDoiDoi" },
+            "method": {
+                "authorizationType": "CUSTOM",
+                "authorizerId" : {"Ref" : "authJwtData"},
+                "httpMethod": "GET",
+                "parameters" : ["header.Authorization","path.doi"]
+            },
+            "integration": {
+                "type": "AWS",
+                "httpMethod" : "POST",
+                "requestTemplates" : {
+                    "application/json" : {
+                      "authorizationToken" : "$input.params().header.get('Authorization')",
+                      "acc" : "publications",
+                      "grants" : "$util.escapeJavaScript($context.authorizer.principalId)"
+                    }
+                },
+                "uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
+            },
+            "responses": {
+                "default": {
+                    "statusCode": "200",
+                    "responseTemplates" : {
+                      "application/json" : "#set($data = $input.path('$.data'))\n#set($wanted = $util.urlDecode($input.params('doi')))\n{\n#foreach($set in $data)\n  \"$set.dataset\" : {\n  \"title\" : \"$set.metadata.title\",\n  \"dois\" : $set.dois.values\n },\n#end\n  \"specific\" : [\n#foreach($set in $data)\n#if($set.dois.values.contains($wanted)) \"$set.dataset\" #end,\n#end\n    \"end\"\n  ]\n}"
+                    }
+                }
+            }
+        }
+    },
+    "dataApiDoiPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/GET/doi/{doi}"]]
+                    }
+        },
+        "DependsOn" : "dataApi"
+    },
     "dataApiData" : {
       "Type" : "Custom::ApiResource",
       "Properties" : {
