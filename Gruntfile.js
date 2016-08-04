@@ -18,12 +18,24 @@ AWS.Request.prototype.promise = function() {
   }.bind(this));
 };
 
-var read_stack_resources = function(stack) {
-	var cloudformation = new AWS.CloudFormation({region:'us-east-1'});
-	return cloudformation.listStackResources({ 'StackName' : stack }).promise().then(function(resources) {
+var cloudformation = new AWS.CloudFormation({region:'us-east-1'});
+
+var new_resources_func = function(stack,resources) {
+	if (resources.data.NextToken) {
+		return cloudformation.listStackResources({'StackName' : stack, 'NextToken' : resources.data.NextToken }).promise()
+		.then(new_resources_func.bind(null,stack))
+		.then(function(nextpage) {
+			return resources.data.StackResourceSummaries.concat(nextpage);
+		});
+	} else {
 		return resources.data.StackResourceSummaries;
-		console.log();
-	}).catch(function(err) {
+	}
+};
+
+var read_stack_resources = function(stack) {
+	return cloudformation.listStackResources({ 'StackName' : stack }).promise()
+	.then(new_resources_func.bind(null,stack))
+	.catch(function(err) {
 		console.log(err);
 		console.log(err.stack);
 		return Promise.resolve(true);
