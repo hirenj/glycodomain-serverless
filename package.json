@@ -12,6 +12,7 @@
     "lambda-grantauths": "hirenj/lambda-grantauths",
     "lambda-syncgroups": "hirenj/lambda-syncgroups",
     "lambda-gatordata": "hirenj/lambda-clustal",
+    "lambda-certificatemanager" : "hirenj/lambda-certificatemanager",
     "lambda-glycodomain-domains" : "hirenj/lambda-glycodomain-domains"
   },
   "repository": {
