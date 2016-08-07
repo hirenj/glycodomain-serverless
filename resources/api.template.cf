@@ -15,6 +15,14 @@
       "Type" : "String",
       "Default" : "test-loginhandler-HBZOMGEME6KI",
       "Description" : "Enter function name for loginhandler function"
+    },
+    "acceptWebhook" : {
+      "Type" : "String",
+      "Default" : "test-acceptWebhook-OEJ7E1VFOLGB"
+    },
+    "readAllData" : {
+      "Type" : "String",
+      "Default" : "test-readAllData-629PKZ1CQK7E"
     }
   },
   "Resources": {
@@ -111,6 +119,82 @@
             "StatusCode" : "200"
           }],
           "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" }, "/invocations" ] ]}
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
+    "dataApiHook" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Fn::GetAtt": ["dataApi", "RootResourceId"] },
+        "PathPart": "hook"
+      }
+    },
+    "dataApiHookPOST" : {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiHook" },
+        "HttpMethod": "POST",
+        "AuthorizationType": "NONE",
+        "RequestParameters" : {},
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod" : "POST",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "RequestParameters" : {},
+          "RequestTemplates" : {},
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "StatusCode" : "200"
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "acceptWebhook" }, "/invocations" ] ]}
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
+    "dataApiDoi" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Fn::GetAtt": ["dataApi", "RootResourceId"] },
+        "PathPart": "doi"
+      }
+    },
+    "dataApiDoiDoi" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiDoi" },
+        "PathPart": "{doi}"
+      }
+    },
+    "dataApiDoiDoiGET" : {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiDoiDoi" },
+        "HttpMethod": "GET",
+        "AuthorizationType": "CUSTOM",
+        "AuthorizerId" : { "Ref" : "authDatahandler" },
+        "RequestParameters" : { "method.request.header.Authorization" : true,
+                                "method.request.path.doi" : true },
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod" : "POST",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "RequestParameters" : {},
+          "RequestTemplates" : { "application/json" : "{ \"Authorization\" : \"$input.params().header.get('Authorization')\", \n \"acc\" : \"publications\",\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\" }"},
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : { "application/json" : "#set($data = $input.path('$.data'))\n#set($wanted = $util.urlDecode($input.params('doi')))\n{\n#foreach($set in $data)\n  \"$set.dataset\" : {\n  \"title\" : \"$set.metadata.title\",\n  \"dois\" : $set.dois.values\n },\n#end\n  \"specific\" : [\n#foreach($set in $data)\n#if($set.dois.values.contains($wanted)) \"$set.dataset\" #end,\n#end\n    \"end\"\n  ]\n}" },
+            "StatusCode" : "200"
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
         },
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
