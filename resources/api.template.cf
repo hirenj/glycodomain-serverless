@@ -49,6 +49,14 @@
         "RestApiId": { "Ref": "dataApi" }
       }
     },
+    "authLoginhandlerPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "loginhandler" } ] ]},
+            "Principal": "apigateway.amazonaws.com"
+        }
+    },
     "authDatahandler": {
       "Type": "AWS::ApiGateway::Authorizer",
       "Properties": {
@@ -60,6 +68,14 @@
         "Name": "Data_access_authoriser",
         "RestApiId": { "Ref": "dataApi" }
       }
+    },
+    "authDatahandlerPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "datahandler" } ] ]},
+            "Principal": "apigateway.amazonaws.com"
+        }
     },
     "dataApiLogin" : {
       "Type": "AWS::ApiGateway::Resource",
@@ -92,6 +108,19 @@
         },
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
+    },
+    "dataApiLoginGETPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/GET/login"]]
+                    }
+        }
     },
     "dataApiExchangetoken" : {
       "Type": "AWS::ApiGateway::Resource",
@@ -127,6 +156,19 @@
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
     },
+    "dataApiExchangeTokenPOSTPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/POST/exchangetoken"]]
+                    }
+        }
+    },
     "dataApiHook" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
@@ -159,6 +201,19 @@
         },
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
+    },
+    "dataApiHookPOSTPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "acceptWebhook" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/POST/hook"]]
+                    }
+        }
     },
     "dataApiDoi" : {
       "Type": "AWS::ApiGateway::Resource",
@@ -203,6 +258,19 @@
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
     },
+    "dataApiDoiDoiGETPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/GET/doi/{doi}"]]
+                    }
+        }
+    },
     "dataApiData" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
@@ -216,7 +284,7 @@
       "Properties": {
         "RestApiId": { "Ref": "dataApi" },
         "ParentId": { "Ref" : "dataApiData" },
-        "PathPart": "data"
+        "PathPart": "latest"
       }
     },
     "dataApiDataLatestDataset" : {
@@ -263,6 +331,19 @@
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
     },
+    "dataApiDataLatestDatasetAccGETPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/GET/data/latest/{dataset}/{acc}"]]
+                    }
+        }
+    },
     "dataApiDataLatestCombined" : {
       "Type" : "AWS::ApiGateway::Resource",
       "Properties" : {
@@ -306,6 +387,19 @@
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
     },
+    "dataApiDataLatestCombinedAccGETPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/GET/data/latest/combined/{acc}"]]
+                    }
+        }
+    },
     "dataApiTools" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
@@ -348,6 +442,19 @@
         },
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
+    },
+    "dataApiToolsClustalPOSTPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "clustal" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/POST/tools/clustal"]]
+                    }
+        }
     }
   }
 }
