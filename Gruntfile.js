@@ -42,6 +42,13 @@ var read_stack_resources = function(stack) {
 	});
 };
 
+var read_stack_region = function(stack) {
+	return cloudformation.describeStacks({'StackName' : stack}).promise()
+	.then(function(stack_info) {
+		return stack_info.data.Stacks[0].StackId.split(':')[3];
+	});
+};
+
 var enable_cors = function(template) {
 	var resources = Object.keys(template.Resources);
 	var methods = resources.filter(function(res) { return template.Resources[res].Type === 'AWS::ApiGateway::Method' });
@@ -152,9 +159,12 @@ module.exports = function(grunt) {
 		var done = this.async();
 		stack = stack || 'test';
 		read_stack_resources(stack).then(function(resources) {
-			var summary = summarise_resources(stack,resources);
-			grunt.file.write(stack+'-resources.conf.json',JSON.stringify(summary,null,'  '));
-			done();
+			return read_stack_region(stack).then(function(region) {
+				var summary = summarise_resources(stack,resources);
+				summary.region = region;
+				grunt.file.write(stack+'-resources.conf.json',JSON.stringify(summary,null,'  '));
+				done();
+			});
 		});
 	});
 
