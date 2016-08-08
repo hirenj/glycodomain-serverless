@@ -123,11 +123,15 @@ var summarise_resources = function(stack,resources) {
 		return resource.ResourceType == 'AWS::S3::Bucket';
 	});
 	var queue = resources.filter(function(resource) {
-		return 	resource.ResourceType == 'AWS::SQS::Queue' ||
+		return resource.ResourceType == 'AWS::SQS::Queue' ||
 				resource.ResourceType == 'AWS::SNS::Topic'
+	});
+	var key = resources.filter(function(resource) {
+		return resource.ResourceType == 'AWS::KMS::Key';
 	});
 	var stack_conf = { 	'stack' : stack,
 						'functions' : make_lookup(lambdas),
+						'keys' : make_lookup(key),
 						'tables' : make_lookup(dynamodbs),
 						'buckets' : make_lookup(buckets),
 						'queue' : make_lookup(queue) };
