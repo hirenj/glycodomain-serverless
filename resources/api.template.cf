@@ -37,6 +37,26 @@
         "Name" : "GatorData REST api"
       }
     },
+    "productionDeployment": {
+      "DependsOn": "dataApiLoginGET",
+      "Type": "AWS::ApiGateway::Deployment",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "Description": "Default Deployment",
+        "StageName": "productionDeploymentDummyStage"
+      }
+    },
+    "Production": {
+      "Type": "AWS::ApiGateway::Stage",
+      "Properties": {
+        "StageName": "Production",
+        "Description": "Production Stage",
+        "RestApiId": { "Ref": "dataApi" },
+        "DeploymentId": { "Ref": "productionDeployment" },
+        "Variables": { "Stack": { "Ref": "AWS::StackName" } },
+        "MethodSettings": []
+      }
+    },
     "authLoginhandler": {
       "Type": "AWS::ApiGateway::Authorizer",
       "Properties": {

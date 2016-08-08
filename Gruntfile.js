@@ -42,6 +42,61 @@ var read_stack_resources = function(stack) {
 	});
 };
 
+var enable_cors = function(template) {
+	var resources = Object.keys(template.Resources);
+	var methods = resources.filter(function(res) { return template.Resources[res].Type === 'AWS::ApiGateway::Method' });
+	methods.forEach(function(method) {
+		make_cors(template.Resources,method);
+		var resource = template.Resources[method];
+		var options_method = JSON.parse(JSON.stringify(resource));
+		options_method.Properties.HttpMethod = 'OPTIONS';
+		if (options_method.Properties.RequestParameters) {
+			delete options_method.Properties.RequestParameters['method.request.header.Authorization'];
+		}
+		options_method.Properties.Integration = {'Type' : 'MOCK'};
+		options_method.Properties.Integration.IntegrationResponses = [
+		{
+			"ResponseParameters": {
+				"method.response.header.Access-Control-Allow-Origin": "'*'",
+				"method.response.header.Access-Control-Allow-Headers" : "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+				"method.response.header.Access-Control-Allow-Credentials" : "'true'",
+				"method.response.header.Access-Control-Allow-Max-Age" : "'1800'",
+				"method.response.header.Access-Control-Allow-Expose-Headers" : "''",
+				"method.response.header.Access-Control-Allow-Methods" : "'"+resource.Properties.HttpMethod+",OPTIONS'"
+			},
+			"ResponseTemplates": { 'application/json' : '' },
+			"StatusCode": 200
+    }];
+    options_method.Properties.MethodResponses = [
+		{
+			"ResponseParameters": {
+				"method.response.header.Access-Control-Allow-Origin": true,
+				"method.response.header.Access-Control-Allow-Headers": true,
+				"method.response.header.Access-Control-Allow-Credentials": true,
+				"method.response.header.Access-Control-Allow-Max-Age": true,
+				"method.response.header.Access-Control-Allow-Expose-Headers": true,
+				"method.response.header.Access-Control-Allow-Methods": true
+			},
+			"StatusCode": 200
+		}];
+		options_method.Properties.AuthorizationType = "NONE";
+		delete options_method.Properties.AuthorizerId;
+		template.Resources[method+'OPTIONS'] = options_method;
+	});
+};
+
+var make_cors = function(resources,method) {
+	var resource  = resources[method];
+	resource.Properties.Integration.IntegrationResponses.forEach(function(int_resp) {
+		int_resp.ResponseParameters = int_resp.ResponseParameters || {};
+		int_resp.ResponseParameters['method.response.header.Access-Control-Allow-Origin'] = "'*'";
+	});
+	resource.Properties.MethodResponses.forEach(function(method_resp) {
+		method_resp.ResponseParameters = method_resp.ResponseParameters || {};
+		method_resp.ResponseParameters['method.response.header.Access-Control-Allow-Origin'] = true;
+	});
+};
+
 var make_lookup = function(resources) {
 	var result = {};
 	resources.forEach(function(resource) {
@@ -140,6 +195,7 @@ module.exports = function(grunt) {
 			});
 			return prev;
 		});
+		enable_cors(common_template);
 		grunt.file.write('glycodomain.template',JSON.stringify(common_template,null,'  '));
 	});
 };
