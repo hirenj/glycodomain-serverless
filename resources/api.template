@@ -468,7 +468,7 @@
     "Production": {
       "Type": "AWS::ApiGateway::Stage",
       "Properties": {
-        "StageName": "Production",
+        "StageName": "api",
         "Description": "Production Stage",
         "RestApiId": { "Ref": "dataApi" },
         "DeploymentId": { "Ref": "productionDeployment" },
