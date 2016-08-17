@@ -1,0 +1,3 @@
+#!/bin/bash
+
+for submodule in node_modules/lambda-*; do (cd "$submodule"; grunt deploy ); done

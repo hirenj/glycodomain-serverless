@@ -18,7 +18,7 @@ AWS.Request.prototype.promise = function() {
   }.bind(this));
 };
 
-var cloudformation = new AWS.CloudFormation({region:'us-east-1'});
+var cloudformation;
 
 var new_resources_func = function(stack,resources) {
 	if (resources.data.NextToken) {
@@ -141,6 +141,15 @@ var summarise_resources = function(stack,resources) {
 
 module.exports = function(grunt) {
 	require('load-grunt-tasks')(grunt);
+
+	AWS.config.update({region:'us-east-1'});
+
+
+	if (grunt.option('region')) {
+		AWS.config.update({region:grunt.option('region')});
+	}
+
+	cloudformation = new AWS.CloudFormation();
 
 	var path = require('path');
 	grunt.initConfig({
