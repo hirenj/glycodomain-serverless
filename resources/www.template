@@ -16,14 +16,6 @@
                 "HTTPPort": "80",
                 "HTTPSPort": "443",
                 "OriginProtocolPolicy": "match-viewer"
-              },
-              "OriginPath": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "/"
-                  ]
-                ]
               }
             },
             {
