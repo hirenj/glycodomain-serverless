@@ -482,7 +482,7 @@
           "IntegrationResponses" : [
           {
             "ResponseParameters" : {},
-            "ResponseTemplates" : { "application/json" : "#set($lines = $input.body.split('\\n'))\n#set($header = $lines.get(0).replaceAll('>[a-zA-Z\\|0-9_]+ ','').replaceAll('\"',''))\n#set($empty = $!lines.set(0,''))\n#set($quote = '\"')\n[$quote#foreach($line in $lines)$line.replace('\n','')#end$quote,\"$header\"]" },
+            "ResponseTemplates" : { "application/json" : "#set($lines = $input.body.split('\\n'))\n#set($header = $lines.get(0).replaceAll('>[a-zA-Z\\|0-9_]+ ','').replaceAll('\"',''))\n#set($empty = $!lines.set(0,''))\n#set($quote = '\"')\n{\"data\":[$quote#foreach($line in $lines)$line.replace('\n','')#end$quote,\"$header\"]}" },
             "StatusCode" : 200
           }],
           "Uri" : "http://www.uniprot.org/uniprot/{acc}.fasta"
