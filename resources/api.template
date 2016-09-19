@@ -447,6 +447,49 @@
                     }
         }
     },
+    "dataApiDataLatestUniprot" : {
+      "Type" : "AWS::ApiGateway::Resource",
+      "Properties" : {
+          "RestApiId": { "Ref" : "dataApi" },
+          "ParentId": { "Ref" : "dataApiDataLatest" },
+          "PathPart": "uniprot"
+      }
+    },
+    "dataApiDataLatestUniprotAcc" : {
+      "Type" : "AWS::ApiGateway::Resource",
+      "Properties" : {
+          "RestApiId": { "Ref" : "dataApi" },
+          "ParentId": { "Ref" : "dataApiDataLatestUniprot" },
+          "PathPart": "{acc}"
+      }
+    },
+    "dataApiDataLatestUniprotAccGET" : {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiDataLatestUniprotAcc" },
+        "HttpMethod": "GET",
+        "AuthorizationType": "CUSTOM",
+        "AuthorizerId" : { "Ref" : "authDatahandler" },
+        "RequestParameters" : { "method.request.path.acc" : true },
+        "Integration": {
+          "Type": "HTTP",
+          "CacheKeyParameters" : ["method.request.path.acc"],
+          "IntegrationHttpMethod" : "GET",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "RequestParameters" : { "integration.request.path.acc" : "method.request.path.acc" },
+          "RequestTemplates" : {},
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : { "application/json" : "#set($lines = $input.body.split('\\n'))\n#set($empty = $!lines.set(0,''))\n#set($quote = '\"')\n$quote#foreach($line in $lines)$line.replace('\n','')#end$quote" },
+            "StatusCode" : 200
+          }],
+          "Uri" : "http://www.uniprot.org/uniprot/{acc}.fasta"
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
     "dataApiTools" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
