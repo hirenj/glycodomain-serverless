@@ -4,21 +4,24 @@
 
 require('es6-promise').polyfill();
 var AWS = require('aws-sdk');
+var jsondiffpatch = require('jsondiffpatch').create({});
+var is_new_template = false;
 
 AWS.Request.prototype.promise = function() {
-  return new Promise(function(accept, reject) {
+	return new Promise(function(accept, reject) {
 	this.on('complete', function(response) {
-	  if (response.error) {
+		if (response.error) {
 		reject(response.error);
-	  } else {
+		} else {
 		accept(response);
-	  }
+		}
 	});
 	this.send();
-  }.bind(this));
+	}.bind(this));
 };
 
 var cloudformation;
+var s3;
 
 var new_resources_func = function(stack,resources) {
 	if (resources.data.NextToken) {
@@ -74,8 +77,8 @@ var enable_cors = function(template) {
 			},
 			"ResponseTemplates": { 'application/json' : '' },
 			"StatusCode": 200
-    }];
-    options_method.Properties.MethodResponses = [
+		}];
+		options_method.Properties.MethodResponses = [
 		{
 			"ResponseParameters": {
 				"method.response.header.Access-Control-Allow-Origin": true,
@@ -142,6 +145,9 @@ var summarise_resources = function(stack,resources) {
 module.exports = function(grunt) {
 	require('load-grunt-tasks')(grunt);
 
+	grunt.loadNpmTasks('grunt-confirm');
+
+
 	AWS.config.update({region:'us-east-1'});
 
 
@@ -150,9 +156,18 @@ module.exports = function(grunt) {
 	}
 
 	cloudformation = new AWS.CloudFormation();
+	s3 = new AWS.S3();
 
 	var path = require('path');
 	grunt.initConfig({
+		confirm: {
+			update_cloudformation: {
+				options: {
+					question: 'Do you want to deploy the template? :',
+					input: '_key:y' // Continue the flow if `Y` key is pressed.
+				}
+			}
+		},
 		grunt: {
 			deploy_jwt: {
 				gruntfile: 'node_modules/lambda-jwt/Gruntfile.js',
@@ -168,6 +183,32 @@ module.exports = function(grunt) {
 			}
 		}
 	});
+
+	grunt.registerTask('uploadlambda', function(dir) {
+		var done = this.async();
+
+		grunt.log.writeln('processing ' + dir);
+
+		grunt.util.spawn({
+			grunt: true,
+			args:['deploy'],
+			opts: {
+				cwd: dir
+			}
+		},
+
+		function(err, result, code) {
+			if (err == null) {
+				grunt.log.writeln('Uploaded ' + dir);
+				done();
+			}
+			else {
+				grunt.log.writeln('Uploading ' + dir + ' failed: ' + code);
+				done(false);
+			}
+		})
+	});
+
 
 	grunt.registerTask('get_resources', 'Get CloudFormation resources', function(stack) {
 		var done = this.async();
@@ -189,10 +230,63 @@ module.exports = function(grunt) {
 		});
 	});
 
-  grunt.registerTask('deploy', 'Retrieve resources and deploy', function(stack) {
-  	grunt.task.run('get_resources:'+stack);
-  	grunt.task.run('deploy_lambdas:'+stack);
-  });
+	grunt.registerTask('upload_lambdas', 'Upload lambdas', function(stack) {
+		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		lambda_modules.forEach(function(module) {
+			grunt.task.run('uploadlambda:'+module);
+		});
+	});
+
+	grunt.registerTask('deploy', 'Retrieve resources and deploy', function(stack) {
+		grunt.task.run('get_resources:'+stack);
+		grunt.task.run('deploy_lambdas:'+stack);
+		grunt.task.run('upload_lambdas:'+stack);
+	});
+
+	grunt.registerTask('get_current_template','Get cloudformation template',function(stack) {
+		var done = this.async();
+		cloudformation.getTemplate({'StackName' : stack}).promise().then((response) => {
+			grunt.file.write(stack+'_last.template',JSON.stringify(JSON.parse(response.data.TemplateBody),null,'  '));
+			done();
+		});
+	});
+
+	grunt.registerTask('compare_templates','Compare two CloudFormation templates',function(stack) {
+		grunt.task.run('get_current_template:'+stack);
+		grunt.task.run('diff_template:'+stack);
+	});
+
+	grunt.registerTask('update_cloudformation','Update a stack if necessary',function() {
+		var stack = grunt.option('stack');
+		var done = this.async();
+		if (is_new_template) {
+			var key = (new Date()).getTime()+'glycodomain.template';
+			s3.putObject({ Bucket: grunt.option('cf-bucket'), Key: key, Body: grunt.file.read('glycodomain.template') }).promise().then(() => {
+				console.log("Created template on S3, initiating changeset");
+				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, TemplateURL: 'https://s3.amazonaws.com/'+grunt.option('cf-bucket')+'/'+key }).promise().then((response) => {
+					console.log(response.data);
+				});
+			}).catch((err) => console.log(err)).then(() => done() );;
+		} else {
+			done();
+		}
+	});
+
+	grunt.registerTask('deploy_stack','',function(stack) {
+		grunt.option('stack',stack);
+		grunt.task.run('build_cloudformation');
+		grunt.task.run('get_current_template:'+stack);
+		grunt.task.run('compare_templates:'+stack);
+		grunt.task.run('update_cloudformation');
+	});
+
+	grunt.registerTask('diff_template','Diff two CloudFormation templates',function(stack) {
+		let diff = require('rus-diff').rusDiff(grunt.file.readJSON(stack+'_last.template'),grunt.file.readJSON('glycodomain.template'));
+		if (Object.keys(diff).length !== 0) {
+			is_new_template = true;
+			console.log(diff);
+		}
+	});
 
 	grunt.registerTask('build_cloudformation', 'Build cloudformation template',function() {
 		var template_paths = ['empty.template'];

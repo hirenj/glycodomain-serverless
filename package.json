@@ -8,12 +8,12 @@
   },
   "dependencies": {
     "es6-promise": "^3.1.2",
-    "lambda-gatordata": "hirenj/lambda-gatordata",
+    "lambda-certificatemanager": "hirenj/lambda-certificatemanager",
+    "lambda-gatordata": "hirenj/lambda-clustal",
+    "lambda-glycodomain-domains": "hirenj/lambda-glycodomain-domains",
     "lambda-grantauths": "hirenj/lambda-grantauths",
     "lambda-syncgroups": "hirenj/lambda-syncgroups",
-    "lambda-gatordata": "hirenj/lambda-clustal",
-    "lambda-certificatemanager" : "hirenj/lambda-certificatemanager",
-    "lambda-glycodomain-domains" : "hirenj/lambda-glycodomain-domains"
+    "rus-diff": "^1.1.0"
   },
   "repository": {
     "type": "git",
@@ -28,6 +28,7 @@
   "devDependencies": {
     "aws-sdk": "^2.3.1",
     "grunt": "^0.4.5",
+    "grunt-confirm": "^1.0.5",
     "grunt-grunt": "^0.2.4",
     "load-grunt-tasks": "^3.4.1"
   }
