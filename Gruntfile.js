@@ -200,10 +200,12 @@ module.exports = function(grunt) {
 		function(err, result, code) {
 			if (err == null) {
 				grunt.log.writeln('Uploaded ' + dir);
+				grunt.log.writeln(result.stdout);
 				done();
 			}
 			else {
 				grunt.log.writeln('Uploading ' + dir + ' failed: ' + code);
+				grunt.log.writeln(result.stdout);
 				done(false);
 			}
 		})
@@ -223,23 +225,30 @@ module.exports = function(grunt) {
 		});
 	});
 
-	grunt.registerTask('deploy_lambdas', 'Deploy lambdas', function(stack) {
+	grunt.registerTask('copy_configs', 'Copy master lambda conf to target lambdas', function(stack) {
 		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
 		lambda_modules.forEach(function(module) {
 			grunt.file.copy(stack+'-resources.conf.json',module+'/resources.conf.json');
 		});
 	});
 
-	grunt.registerTask('upload_lambdas', 'Upload lambdas', function(stack) {
+	grunt.registerTask('upload_lambdas', 'Upload lambdas only', function(stack) {
+		if (grunt.option('generate-changeset')) {
+			return;
+		}
 		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
 		lambda_modules.forEach(function(module) {
 			grunt.task.run('uploadlambda:'+module);
 		});
 	});
 
-	grunt.registerTask('deploy', 'Retrieve resources and deploy', function(stack) {
+	grunt.registerTask('update_configs','Retrieve resources and set config files in place', function(stack) {
 		grunt.task.run('get_resources:'+stack);
-		grunt.task.run('deploy_lambdas:'+stack);
+		grunt.task.run('copy_configs:'+stack);
+	});
+
+	grunt.registerTask('deploy_lambdas', 'Retrieve resources, copy configs and deploy to AWS', function(stack) {
+		grunt.task.run('update_configs:'+stack);
 		grunt.task.run('upload_lambdas:'+stack);
 	});
 
@@ -256,10 +265,10 @@ module.exports = function(grunt) {
 		grunt.task.run('diff_template:'+stack);
 	});
 
-	grunt.registerTask('update_cloudformation','Update a stack if necessary',function() {
+	grunt.registerTask('update_cloudformation','',function() {
 		var stack = grunt.option('stack');
 		var done = this.async();
-		if (is_new_template) {
+		if (grunt.option('generate-changeset')) {
 			var key = (new Date()).getTime()+'glycodomain.template';
 			s3.putObject({ Bucket: grunt.option('cf-bucket'), Key: key, Body: grunt.file.read('glycodomain.template') }).promise().then(() => {
 				console.log("Created template on S3, initiating changeset");
@@ -272,7 +281,7 @@ module.exports = function(grunt) {
 		}
 	});
 
-	grunt.registerTask('deploy_stack','',function(stack) {
+	grunt.registerTask('deploy_stack','Deploy CloudFormation to a stack',function(stack) {
 		grunt.option('stack',stack);
 		grunt.task.run('build_cloudformation');
 		grunt.task.run('get_current_template:'+stack);
@@ -283,8 +292,8 @@ module.exports = function(grunt) {
 	grunt.registerTask('diff_template','Diff two CloudFormation templates',function(stack) {
 		let diff = require('rus-diff').rusDiff(grunt.file.readJSON(stack+'_last.template'),grunt.file.readJSON('glycodomain.template'));
 		if (Object.keys(diff).length !== 0) {
-			is_new_template = true;
-			console.log(diff);
+			grunt.log.writeln(diff);
+			grunt.option('generate-changeset',true);
 		}
 	});
 
@@ -315,5 +324,9 @@ module.exports = function(grunt) {
 		});
 		enable_cors(common_template);
 		grunt.file.write('glycodomain.template',JSON.stringify(common_template,null,'  '));
+	});
+
+	grunt.registerTask('deploy','Deploy software to AWS',function(stack) {
+		grunt.task.run(['deploy_stack:'+stack,'deploy_lambdas:'+stack]);
 	});
 };
