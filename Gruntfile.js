@@ -292,7 +292,7 @@ module.exports = function(grunt) {
 	grunt.registerTask('diff_template','Diff two CloudFormation templates',function(stack) {
 		let diff = require('rus-diff').rusDiff(grunt.file.readJSON(stack+'_last.template'),grunt.file.readJSON('glycodomain.template'));
 		if (Object.keys(diff).length !== 0) {
-			grunt.log.writeln(diff);
+			grunt.log.writeln(JSON.stringify(diff));
 			grunt.option('generate-changeset',true);
 		}
 	});
@@ -312,6 +312,25 @@ module.exports = function(grunt) {
 				prev.Resources = {};
 			}
 			Object.keys(curr.Resources).forEach(function(key) {
+				if (prev.Resources[key] && prev.Resources[key].Type == 'AWS::S3::Bucket') {
+					var wanted = null;
+					var alternative = null;
+					if (prev.Resources[key].Properties.BucketName) {
+						wanted = prev.Resources[key];
+						alternative = curr.Resources[key];
+					}
+					if (curr.Resources[key].Properties.BucketName) {
+						wanted = curr.Resources[key];
+						alternative = prev.Resources[key];
+					}
+					prev.Resources[key] = wanted;
+					if (! wanted.Properties.NotificationConfiguration && alternative.Properties.NotificationConfiguration ) {
+						wanted.Properties.NotificationConfiguration = {}
+					}
+					wanted.Properties.NotificationConfiguration.LambdaConfigurations = (wanted.Properties.NotificationConfiguration.LambdaConfigurations || []).concat( alternative.Properties.NotificationConfiguration.LambdaConfigurations );
+					wanted.DependsOn = (wanted.DependsOn || []).concat(alternative.DependsOn)
+					curr.Resources[key] = prev.Resources[key];
+				}
 				prev.Resources[key] = curr.Resources[key];
 			});
 			if ( ! prev.Outputs ) {

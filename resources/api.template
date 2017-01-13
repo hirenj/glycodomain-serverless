@@ -169,52 +169,6 @@
                     }
         }
     },
-    "dataApiHook" : {
-      "Type": "AWS::ApiGateway::Resource",
-      "Properties": {
-        "RestApiId": { "Ref": "dataApi" },
-        "ParentId": { "Fn::GetAtt": ["dataApi", "RootResourceId"] },
-        "PathPart": "hook"
-      }
-    },
-    "dataApiHookPOST" : {
-      "Type": "AWS::ApiGateway::Method",
-      "Properties": {
-        "RestApiId": { "Ref": "dataApi" },
-        "ResourceId": { "Ref" : "dataApiHook" },
-        "HttpMethod": "POST",
-        "AuthorizationType": "NONE",
-        "RequestParameters" : {},
-        "Integration": {
-          "Type": "AWS",
-          "IntegrationHttpMethod" : "POST",
-          "PassthroughBehavior" : "WHEN_NO_MATCH",
-          "RequestParameters" : {},
-          "RequestTemplates" : {},
-          "IntegrationResponses" : [
-          {
-            "ResponseParameters" : {},
-            "ResponseTemplates" : {},
-            "StatusCode" : 200
-          }],
-          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "acceptWebhook" }, "/invocations" ] ]}
-        },
-        "MethodResponses" : [{"StatusCode" : 200 }]
-      }
-    },
-    "dataApiHookPOSTPermission": {
-        "Type" : "AWS::Lambda::Permission",
-        "Properties" : {
-            "Action":"lambda:invokeFunction",
-            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "acceptWebhook" } ] ]},
-            "Principal": "apigateway.amazonaws.com",
-            "SourceArn": {
-                "Fn::Join": ["", [
-                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
-                     "/*/POST/hook"]]
-                    }
-        }
-    },
     "dataApiDoi" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {

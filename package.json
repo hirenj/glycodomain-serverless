@@ -12,7 +12,7 @@
     "lambda-gatordata": "hirenj/lambda-clustal",
     "lambda-glycodomain-domains": "hirenj/lambda-glycodomain-domains",
     "lambda-grantauths": "hirenj/lambda-grantauths",
-    "lambda-syncgroups": "hirenj/lambda-syncgroups",
+    "lambda-readuserconf": "hirenj/lambda-readuserconf",
     "rus-diff": "^1.1.0"
   },
   "repository": {
