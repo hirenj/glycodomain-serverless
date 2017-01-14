@@ -4,7 +4,6 @@
 
 require('es6-promise').polyfill();
 var AWS = require('aws-sdk');
-var jsondiffpatch = require('jsondiffpatch').create({});
 var is_new_template = false;
 
 AWS.Request.prototype.promise = function() {
