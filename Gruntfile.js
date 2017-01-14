@@ -274,7 +274,17 @@ module.exports = function(grunt) {
 				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, TemplateURL: 'https://s3.amazonaws.com/'+grunt.option('cf-bucket')+'/'+key }).promise().then((response) => {
 					console.log(response.data);
 				});
-			}).catch((err) => console.log(err)).then(() => done() );;
+			}).catch((err) => {
+				if (err.code == 'ValidationError' && err.message.indexOf('Circular dependency') >= 0) {
+					grunt.log.writeln("Circular dependency, trying to deploy again breaking circular");
+					if ( ! grunt.option('break_circular')) {
+						grunt.option('break_circular',true);
+						grunt.task.run('deploy_stack:'+stack);
+					}
+				} else {
+					console.error(err);
+				}
+			}).then(() => done() );;
 		} else {
 			done();
 		}
@@ -283,7 +293,6 @@ module.exports = function(grunt) {
 	grunt.registerTask('deploy_stack','Deploy CloudFormation to a stack',function(stack) {
 		grunt.option('stack',stack);
 		grunt.task.run('build_cloudformation');
-		grunt.task.run('get_current_template:'+stack);
 		grunt.task.run('compare_templates:'+stack);
 		grunt.task.run('update_cloudformation');
 	});
@@ -340,6 +349,32 @@ module.exports = function(grunt) {
 			});
 			return prev;
 		});
+		if (grunt.option('break_circular')) {
+			Object.keys(common_template.Resources).forEach(function(resource_name) {
+				var resource = common_template.Resources[resource_name];
+				if (resource.Metadata && resource.Metadata.break_circular) {
+					Object.keys(resource.Metadata.break_circular).forEach(function(path_string) {
+						var path = path_string.split('.').map(function(el) {
+							if (! isNaN(parseInt(el))) {
+								return parseInt(el);
+							}
+							return el;
+						});
+						var value = resource.Metadata.break_circular[path_string];
+						var target = resource;
+						while (path.length > 1) {
+							target = target[path.shift()];
+						}
+						if (value) {
+							target[path[0]] = value;
+						} else {
+							delete target[path[0]];
+						}
+					});
+					resource.Metadata.break_circular = true;
+				}
+			});
+		}
 		enable_cors(common_template);
 		grunt.file.write('glycodomain.template',JSON.stringify(common_template,null,'  '));
 	});
