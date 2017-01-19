@@ -7,13 +7,11 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "es6-promise": "^3.1.2",
     "lambda-certificatemanager": "hirenj/lambda-certificatemanager",
-    "lambda-gatordata": "hirenj/lambda-clustal",
-    "lambda-glycodomain-domains": "hirenj/lambda-glycodomain-domains",
+    "lambda-gatordata": "hirenj/lambda-gatordata",
     "lambda-grantauths": "hirenj/lambda-grantauths",
     "lambda-readuserconf": "hirenj/lambda-readuserconf",
-    "rus-diff": "^1.1.0"
+    "lambda-clustal" : "hirenj/lambda-clustal"
   },
   "repository": {
     "type": "git",
@@ -26,6 +24,8 @@
   },
   "homepage": "https://github.com/hirenj/glycodomain-serverless",
   "devDependencies": {
+    "es6-promise": "^3.1.2",
+    "rus-diff": "^1.1.0",
     "aws-sdk": "^2.3.1",
     "grunt": "^0.4.5",
     "grunt-confirm": "^1.0.5",
