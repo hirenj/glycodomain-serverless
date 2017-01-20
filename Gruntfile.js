@@ -341,7 +341,6 @@ module.exports = function(grunt) {
 				}
 				if (prev.Resources[key] && prev.Resources[key].Type == 'AWS::SNS::Topic') {
 					curr.Resources[key].Properties.Subscription = curr.Resources[key].Properties.Subscription.concat(prev.Resources[key].Properties.Subscription);
-					console.log(key);
 				}
 				prev.Resources[key] = curr.Resources[key];
 			});
