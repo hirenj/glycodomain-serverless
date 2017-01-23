@@ -197,6 +197,11 @@ var summarise_resources = function(stack,resources) {
 						'queue' : make_lookup(queue),
 						'rule'  : make_lookup(rule) };
 	return stack_conf;
+};
+
+var fix_deployment_dependency = function(template) {
+	var methods = Object.keys(template.Resources).filter( resource =>  template.Resources[resource].Type == 'AWS::ApiGateway::Method' );
+	template.Resources['productionDeployment'].DependsOn = methods;
 }
 
 module.exports = function(grunt) {
@@ -451,6 +456,7 @@ module.exports = function(grunt) {
 		}
 		enable_cors(common_template);
 		fill_parameters(common_template);
+		fix_deployment_dependency(common_template);
 		grunt.file.write('glycodomain.template',JSON.stringify(common_template,null,'  '));
 	});
 
