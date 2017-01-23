@@ -185,12 +185,17 @@ var summarise_resources = function(stack,resources) {
 	var key = resources.filter(function(resource) {
 		return resource.ResourceType == 'AWS::KMS::Key';
 	});
+	var rule = resources.filter(function(resource) {
+		return resource.ResourceType == 'AWS::Events::Rule';
+	});
+
 	var stack_conf = { 	'stack' : stack,
 						'functions' : make_lookup(lambdas),
 						'keys' : make_lookup(key),
 						'tables' : make_lookup(dynamodbs),
 						'buckets' : make_lookup(buckets),
-						'queue' : make_lookup(queue) };
+						'queue' : make_lookup(queue),
+						'rule'  : make_lookup(rule) };
 	return stack_conf;
 }
 
@@ -309,6 +314,8 @@ module.exports = function(grunt) {
 		cloudformation.getTemplate({'StackName' : stack}).promise().then((response) => {
 			grunt.file.write(stack+'_last.template',JSON.stringify(JSON.parse(response.data.TemplateBody),null,'  '));
 			done();
+		}).catch( err => {
+			console.error(err);
 		});
 	});
 
