@@ -329,9 +329,13 @@ module.exports = function(grunt) {
 		var done = this.async();
 		if (grunt.option('generate-changeset')) {
 			var key = (new Date()).getTime()+'glycodomain.template';
-			s3.putObject({ Bucket: grunt.option('cf-bucket'), Key: key, Body: grunt.file.read('glycodomain.template') }).promise().then(() => {
+			var template_body = grunt.file.read('glycodomain.template');
+			s3.putObject({ Bucket: grunt.option('cf-bucket'), Key: key, Body: template_body }).promise().then(() => {
 				console.log("Created template on S3, initiating changeset");
-				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, TemplateURL: 'https://s3.amazonaws.com/'+grunt.option('cf-bucket')+'/'+key }).promise().then((response) => {
+				var params_options = Object.keys(JSON.parse(template_body).Parameters).
+					filter( param_name => (grunt.option('new-parameters') || []).indexOf(param_name) < 0 ).
+					map( param_name => { return { ParameterKey: param_name, UsePreviousValue: true }; });
+				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+grunt.option('cf-bucket')+'/'+key }).promise().then((response) => {
 					console.log(response.data);
 				});
 			}).catch((err) => {
@@ -362,6 +366,7 @@ module.exports = function(grunt) {
 		if (Object.keys(diff).length !== 0) {
 			grunt.log.writeln(JSON.stringify(diff));
 			grunt.option('generate-changeset',true);
+			grunt.option('new-parameters', Object.keys(diff["$set"] || {}).filter( key => key.indexOf('Parameter') == 0 ).map( key => key.replace(/Parameters\./,'')));
 		}
 	});
 
