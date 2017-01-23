@@ -107,6 +107,59 @@ var make_cors = function(resources,method) {
 	});
 };
 
+var find_keys = function(keyname, object) {
+	if (Array.isArray(object)) {
+		var results = object.map(find_keys.bind(null,keyname)).reduce( (a, b) => {
+			a = a || [];
+			b = b || [];
+			return a.concat(b);
+		},[]);
+		return results.filter( val => val );
+	}
+	var results = [];
+	if (typeof object == 'object') {
+		Object.keys(object).forEach(key => {
+			if (key === keyname) {
+				results.push(object[key]);
+			} else {
+				results = results.concat(find_keys(keyname,object[key]));
+			}
+		});
+		return results.filter( val => val );
+	}
+	return;
+}
+
+var find_non_aws_refs = function(resources) {
+	var vals = find_keys('Ref',resources);
+	return vals.filter( val => {
+		return ! val.match(/^AWS::/);
+	}).filter(onlyUnique);
+};
+
+var onlyUnique = function(value, index, self) {
+	return self.indexOf(value) === index;
+};
+
+var fill_parameters = function(template) {
+	var current_params = Object.keys(template.Parameters || {});
+	var defined_resources = Object.keys(template.Resources || {});
+	var references = find_non_aws_refs(template.Resources);
+	current_params.forEach(param => {
+		if (defined_resources.indexOf(param) >= 0) {
+			delete template.Parameters[param];
+		}
+	});
+	references.forEach( ref => {
+		if (defined_resources.indexOf(ref) < 0 && current_params.indexOf(ref) < 0) {
+			template.Parameters[ref] = {
+				"Type" : "String",
+				"Description": "Parameter " +ref
+			}
+		}
+	});
+};
+
 var make_lookup = function(resources) {
 	var result = {};
 	resources.forEach(function(resource) {
@@ -350,6 +403,12 @@ module.exports = function(grunt) {
 			Object.keys(curr.Outputs || {}).forEach(function(key) {
 				prev.Outputs[key] = curr.Outputs[key];
 			});
+			if ( ! prev.Parameters ) {
+				prev.Parameters = {};
+			}
+			Object.keys(curr.Parameters || {}).forEach(function(key) {
+				prev.Parameters[key] = curr.Parameters[key];
+			});
 			return prev;
 		});
 		if (grunt.option('break_circular')) {
@@ -379,6 +438,7 @@ module.exports = function(grunt) {
 			});
 		}
 		enable_cors(common_template);
+		fill_parameters(common_template);
 		grunt.file.write('glycodomain.template',JSON.stringify(common_template,null,'  '));
 	});
 

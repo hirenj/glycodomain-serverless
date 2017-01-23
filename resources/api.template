@@ -1,33 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
   "Parameters" : {
-    "exchangetoken" : {
-      "Type" : "String",
-      "Default" : "test-exchangetoken-1H1ELT3YAMDXB",
-      "Description" : "Enter function name for exchangetoken function"
-    },
-    "datahandler" : {
-      "Type" : "String",
-      "Default" : "test-datahandler-93F0OU08EKJX",
-      "Description" : "Enter function name for dataHandler function"
-    },
-    "loginhandler" : {
-      "Type" : "String",
-      "Default" : "test-loginhandler-HBZOMGEME6KI",
-      "Description" : "Enter function name for loginhandler function"
-    },
-    "acceptWebhook" : {
-      "Type" : "String",
-      "Default" : "test-acceptWebhook-OEJ7E1VFOLGB"
-    },
-    "readAllData" : {
-      "Type" : "String",
-      "Default" : "test-readAllData-629PKZ1CQK7E"
-    },
-    "clustal" : {
-      "Type" : "String",
-      "Default" : "test-clustal-60WZ8D140RYX"
-    }
   },
   "Resources": {
     "dataApi" : {
