@@ -12,7 +12,8 @@
     "lambda-grantauths": "hirenj/lambda-grantauths",
     "lambda-readuserconf": "hirenj/lambda-readuserconf",
     "lambda-copydatasets": "hirenj/lambda-copydatasets",
-    "lambda-clustal" : "hirenj/lambda-clustal"
+    "lambda-clustal" : "hirenj/lambda-clustal",
+    "lambda-rdatasets" : "hirenj/lambda-rdatasets"
   },
   "repository": {
     "type": "git",
