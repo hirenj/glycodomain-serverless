@@ -188,13 +188,16 @@ var summarise_resources = function(stack,resources) {
 	var rule = resources.filter(function(resource) {
 		return resource.ResourceType == 'AWS::Events::Rule';
 	});
-
+	var stepfunctions = resources.filter(function(resource) {
+		return resource.ResourceType == 'AWS::StepFunctions::StateMachine';
+	});
 	var stack_conf = { 	'stack' : stack,
 						'functions' : make_lookup(lambdas),
 						'keys' : make_lookup(key),
 						'tables' : make_lookup(dynamodbs),
 						'buckets' : make_lookup(buckets),
 						'queue' : make_lookup(queue),
+						'stepfunctions' : make_lookup(stepfunctions),
 						'rule'  : make_lookup(rule) };
 	return stack_conf;
 };
