@@ -147,7 +147,7 @@
           "IntegrationResponses" : [
           {
             "ResponseParameters" : {},
-            "ResponseTemplates" : { "application/json" : "#set($data = $input.path('$.data'))\n#foreach($set in $data)\n#set($idx = $velocityCount - 1)\n#if(\"$data[$idx].metadata.rpackage\" != \"\")\nPackage: $data[$idx].metadata.rpackage\nVersion: 2017.4.1\nNeedsCompilation: no\n\n#end\n#end" },
+            "ResponseTemplates" : { "application/json" : "#set($data = $input.path('$.data'))\n#foreach($set in $data)\n#set($idx = $velocityCount - 1)\n#if(\"$data[$idx].metadata.rpackage\" != \"\")\nPackage: $data[$idx].metadata.rpackage.split('_')[0]\nVersion: $data[$idx].metadata.rpackage.split('_')[1]\nNeedsCompilation: no\n\n#end\n#end" },
             "StatusCode" : 200
           }],
           "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
