@@ -9,8 +9,8 @@
         "AuthorizerResultTtlInSeconds": "300",
         "AuthorizerUri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "rdatasethandler" }, "/invocations" ] ]},
         "Type": "TOKEN",
-        "IdentityValidationExpression" : "Bearer [^\\.]+\\.[^\\.]+\\.[^\\.]+",
-        "IdentitySource": "method.request.header.Authorization",
+        "IdentityValidationExpression" : "[^\\.]+\\.[^\\.]+\\.[^\\.]+",
+        "IdentitySource": "method.request.header.Auth",
         "Name": "Rdataset_access_authoriser",
         "RestApiId": { "Ref": "dataApi" }
       }
@@ -118,6 +118,56 @@
         "PathPart": "contrib"
       }
     },
+    "dataApiRepositorySrcContribPACKAGES" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositorySrcContrib" },
+        "PathPart": "PACKAGES"
+      }
+    },
+    "dataApiRepositorySrcContribPACKAGESPOST": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiRepositorySrcContribPACKAGES" },
+        "HttpMethod": "POST",
+        "AuthorizationType": "CUSTOM",
+        "AuthorizerId" : { "Ref" : "authRdatasethandler" },
+        "RequestParameters" : {
+            "method.request.path.path" : true,
+            "method.request.header.Auth" : true
+        },
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod" : "POST",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "RequestParameters" : {},
+          "RequestTemplates" : { "application/json" : "{ \"Authorization\" : \"$input.params().header.get('Auth')\", \n \"acc\" : \"publications\",\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\" }"},
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : { "application/json" : "#set($data = $input.path('$.data'))\n#foreach($set in $data)\n#set($idx = $velocityCount - 1)\n#if(\"$data[$idx].metadata.rpackage\" != \"\")\nPackage: $data[$idx].metadata.rpackage\nVersion: 2017.4.1\nNeedsCompilation: no\n\n#end\n#end" },
+            "StatusCode" : 200
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
+    "dataApiRepositorySrcContribPACKAGESPOSTPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/POST/repository/src/contrib/PACKAGES"]]
+                    }
+        }
+    },
     "dataApiRepositorySrcContribPath" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
@@ -133,8 +183,7 @@
         "ResourceId": { "Ref" : "dataApiRepositorySrcContribPath" },
         "HttpMethod": "POST",
         "AuthorizationType": "NONE",
-        "RequestParameters" : { 
-            "method.request.path.token" : true,
+        "RequestParameters" : {
             "method.request.path.path" : true
         },
         "Integration": {
