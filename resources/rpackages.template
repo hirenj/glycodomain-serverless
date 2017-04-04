@@ -1,0 +1,179 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters" : {
+  },
+  "Resources": {
+    "authRdatasethandler": {
+      "Type": "AWS::ApiGateway::Authorizer",
+      "Properties": {
+        "AuthorizerResultTtlInSeconds": "300",
+        "AuthorizerUri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "rdatasethandler" }, "/invocations" ] ]},
+        "Type": "TOKEN",
+        "IdentityValidationExpression" : "Bearer [^\\.]+\\.[^\\.]+\\.[^\\.]+",
+        "IdentitySource": "method.request.header.Authorization",
+        "Name": "Rdataset_access_authoriser",
+        "RestApiId": { "Ref": "dataApi" }
+      }
+    },
+    "authRdatasethandlerPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "rdatasethandler" } ] ]},
+            "Principal": "apigateway.amazonaws.com"
+        }
+    },
+    "dataApiRepository" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Fn::GetAtt": ["dataApi", "RootResourceId"] },
+        "PathPart": "repository"
+      }
+    },
+    "dataApiRepositoryToken" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepository" },
+        "PathPart": "token"
+      }
+    },
+    "dataApiRepositoryTokenToken" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositoryToken" },
+        "PathPart": "{token}"
+      }
+    },
+    "dataApiRepositoryTokenTokenSrc" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositoryTokenToken" },
+        "PathPart": "src"
+      }
+    },
+    "dataApiRepositoryTokenTokenSrcContrib" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositoryTokenTokenSrc" },
+        "PathPart": "contrib"
+      }
+    },
+    "dataApiRepositoryTokenTokenSrcContribPath" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositoryTokenTokenSrcContrib" },
+        "PathPart": "{path}"
+      }
+    },
+    "dataApiRepositoryTokenTokenSrcContribPathGET": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiRepositoryTokenTokenSrcContribPath" },
+        "HttpMethod": "GET",
+        "AuthorizationType": "NONE",
+        "RequestParameters" : { 
+            "method.request.path.token" : true,
+            "method.request.path.path" : true
+        },
+        "Integration": {
+          "Type": "HTTP",
+          "IntegrationHttpMethod" : "POST",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "RequestTemplates" : {},
+          "RequestParameters" : {
+            "integration.request.header.Auth" : "method.request.path.token",
+            "integration.request.path.path" : "method.request.path.path"
+          },
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "StatusCode" : 200
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "https://",{"Ref" : "dataApi"}, ".execute-api.",{ "Ref" : "AWS::Region" },".amazonaws.com/api/repository/src/contrib/{path}" ] ]}
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
+    "dataApiRepositorySrc" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepository" },
+        "PathPart": "src"
+      }
+    },
+    "dataApiRepositorySrcContrib" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositorySrc" },
+        "PathPart": "contrib"
+      }
+    },
+    "dataApiRepositorySrcContribPath" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositorySrcContrib" },
+        "PathPart": "{path}"
+      }
+    },
+    "dataApiRepositorySrcContribPathPOST": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiRepositorySrcContribPath" },
+        "HttpMethod": "POST",
+        "AuthorizationType": "NONE",
+        "RequestParameters" : { 
+            "method.request.path.token" : true,
+            "method.request.path.path" : true
+        },
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod" : "GET",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "Credentials" : {"Fn::GetAtt" : ["ReadRDatasetsRole", "Arn"] },
+          "RequestTemplates" : {},
+          "RequestParameters" : {
+            "integration.request.path.path" : "method.request.path.path"
+          },
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "StatusCode" : 200
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{"Ref":"AWS::Region"},":s3:path/", "test-gator" ,"/rdata/{path}" ] ] }
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
+    "ReadRDatasetsRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "ManagedPolicyArns" : [{ "Ref" : "ReadRDatasets" }],
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
