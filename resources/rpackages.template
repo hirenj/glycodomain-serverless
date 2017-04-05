@@ -109,13 +109,20 @@
           },
           "IntegrationResponses" : [
           {
-            "ResponseParameters" : {},
+            "ResponseParameters" : {
+              "method.response.header.Content-Type": "'text/plain'"
+            },
             "ResponseTemplates" : {},
             "StatusCode" : 200
           }],
           "Uri" : { "Fn::Join" :  [ "", [ "https://",{"Ref" : "dataApi"}, ".execute-api.",{ "Ref" : "AWS::Region" },".amazonaws.com/api/repository/src/contrib/{path}" ] ]}
         },
-        "MethodResponses" : [{"StatusCode" : 200 }]
+        "MethodResponses" : [{
+          "StatusCode" : 200,
+          "ResponseParameters": {
+            "method.response.header.Content-Type": true
+          }
+        }]
       }
     },
     "dataApiRepositoryTokenTokenSrcContribPackagesGzGET": {
@@ -327,7 +334,8 @@
         "RestApiId": { "Ref": "dataApi" },
         "ResourceId": { "Ref" : "dataApiRepositorySrcContribPath" },
         "HttpMethod": "POST",
-        "AuthorizationType": "NONE",
+        "AuthorizationType": "CUSTOM",
+        "AuthorizerId" : { "Ref" : "authRdatasethandler" },
         "RequestParameters" : {
             "method.request.path.path" : true
         },
