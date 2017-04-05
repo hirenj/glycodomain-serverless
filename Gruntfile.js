@@ -57,6 +57,9 @@ var enable_cors = function(template) {
 	methods.forEach(function(method) {
 		make_cors(template.Resources,method);
 		var resource = template.Resources[method];
+		if (resource.Properties.HttpMethod === 'HEAD') {
+			return;
+		}
 		var options_method = JSON.parse(JSON.stringify(resource));
 		options_method.Properties.HttpMethod = 'OPTIONS';
 		if (options_method.Properties.RequestParameters) {
