@@ -137,15 +137,16 @@
         },
         "Integration": {
           "Type": "MOCK",
+          "RequestTemplates" : { "application/json" : "{ \"statusCode\" : 403 }"},
           "IntegrationResponses" : [
           {
             "ResponseParameters": {},
             "ResponseTemplates": {},
             "SelectionPattern" : ".*",
-            "StatusCode" : 404
+            "StatusCode" : 403
           }]
         },
-        "MethodResponses" : [{"StatusCode" : 404 }]
+        "MethodResponses" : [{"StatusCode" : 403 }]
       }
     },
     "dataApiRepositoryTokenTokenSrcContribPathGET": {
@@ -242,16 +243,16 @@
         },
         "Integration": {
           "Type": "MOCK",
-          "RequestTemplates" : { "application/json" : "{ \"statusCode\" : 404 }"},
+          "RequestTemplates" : { "application/json" : "{ \"statusCode\" : 403 }"},
           "IntegrationResponses" : [
           {
             "ResponseParameters" : {},
             "ResponseTemplates" : {},
             "SelectionPattern" : ".*",
-            "StatusCode" : 404
+            "StatusCode" : 403
           }]
         },
-        "MethodResponses" : [{"StatusCode" : 404 }]
+        "MethodResponses" : [{"StatusCode" : 403 }]
       }
     },
     "dataApiRepositorySrc" : {
