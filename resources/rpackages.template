@@ -300,7 +300,7 @@
           "IntegrationResponses" : [
           {
             "ResponseParameters" : {},
-            "ResponseTemplates" : { "application/json" : "#set($data = $input.path('$.data'))\n#foreach($set in $data)\n#set($idx = $velocityCount - 1)\n#if(\"$data[$idx].metadata.rpackage\" != \"\")\nPackage: $data[$idx].metadata.rpackage.split('_')[0]\nFile: $data[$idx].metadata.rpackage\nVersion: $data[$idx].metadata.rpackage.split('_')[1]\nNeedsCompilation: no\n\n#end\n#end" },
+            "ResponseTemplates" : { "application/json" : "#set($data = $input.path('$.data'))\n#set($packages = [])\n#foreach($set in $data)\n#set($idx = $velocityCount - 1)\n#if(\"$data[$idx].metadata.rpackage\" != \"\")\n#set($foo = $packages.add($data[$idx].metadata.rpackage))\nPackage: $data[$idx].metadata.rpackage.split('_')[0]\nFile: $data[$idx].metadata.rpackage\nVersion: $data[$idx].metadata.rpackage.split('_')[1]\nNeedsCompilation: no\n\n#end\n#end\n#set($now = $input.path('$.retrieved'))\n#set($today = $now.split('T')[0])\nPackage: gatordata\nFile: gatordata.tar.gz\nVersion: $today.replace('-','.')\nNeedsCompilation: no\nImports:\n#foreach($set in $packages)\n#set($idx = $velocityCount - 1)\n    $set.split('_')[0] (>= $set.split('_')[1]) #if($velocityCount < ${packages.size()}),#end\n#end" },
             "StatusCode" : 200
           }],
           "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "readAllData" }, "/invocations" ] ]}
