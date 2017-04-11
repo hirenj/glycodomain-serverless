@@ -13,7 +13,9 @@
     "lambda-readuserconf": "hirenj/lambda-readuserconf",
     "lambda-copydatasets": "hirenj/lambda-copydatasets",
     "lambda-clustal" : "hirenj/lambda-clustal",
-    "lambda-rdatasets" : "hirenj/lambda-rdatasets"
+    "lambda-rdatasets" : "hirenj/lambda-rdatasets",
+    "lambda-update_metadata" : "hirenj/lambda-update_metadata",
+    "lambda-gatordata-postprocess" : "hirenj/lambda-gatordata-postprocess"
   },
   "repository": {
     "type": "git",
