@@ -355,7 +355,7 @@
             "ResponseTemplates" : {},
             "StatusCode" : 200
           }],
-          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{"Ref":"AWS::Region"},":s3:path/", "test-gator" ,"/rdata/{path}" ] ] }
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{"Ref":"AWS::Region"},":s3:path/", {"Ref":"AWS::StackName"} ,"-gator/rdata/{path}" ] ] }
         },
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
