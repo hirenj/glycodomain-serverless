@@ -84,7 +84,7 @@
             "DefaultTTL" : "0",
             "MaxTTL" : "0",
             "TargetOriginId": "S3Origin",
-            "ViewerProtocolPolicy": "allow-all"
+            "ViewerProtocolPolicy": "redirect-to-https"
           },
           "CustomErrorResponses": [{
             "ErrorCachingMinTTL" : 0,
