@@ -338,15 +338,16 @@ module.exports = function(grunt) {
 	grunt.registerTask('update_cloudformation','',function() {
 		var stack = grunt.option('stack');
 		var done = this.async();
+		var stackconfig = require('./'+stack+'-resources.conf.json');
 		if (grunt.option('generate-changeset')) {
 			var key = (new Date()).getTime()+'glycodomain.template';
 			var template_body = grunt.file.read('glycodomain.template');
-			s3.putObject({ Bucket: grunt.option('cf-bucket'), Key: key, Body: template_body }).promise().then(() => {
+			s3.putObject({ Bucket: stackconfig.buckets.codeupdates, Key: 'templates/'+key, Body: template_body }).promise().then(() => {
 				console.log("Created template on S3, initiating changeset");
 				var params_options = Object.keys(JSON.parse(template_body).Parameters).
 					filter( param_name => (grunt.option('new-parameters') || []).indexOf(param_name) < 0 ).
 					map( param_name => { return { ParameterKey: param_name, UsePreviousValue: true }; });
-				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+grunt.option('cf-bucket')+'/'+key }).promise().then((response) => {
+				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+stackconfig.buckets.codeupdates+'/templates/'+key }).promise().then((response) => {
 					console.log(response.data);
 				});
 			}).catch((err) => {
