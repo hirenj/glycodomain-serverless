@@ -7,15 +7,16 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "auth0": "^2.7.0",
     "lambda-certificatemanager": "hirenj/lambda-certificatemanager",
-    "lambda-gatordata": "hirenj/lambda-gatordata",
-    "lambda-grantauths": "hirenj/lambda-grantauths",
-    "lambda-readuserconf": "hirenj/lambda-readuserconf",
+    "lambda-clustal": "hirenj/lambda-clustal",
     "lambda-copydatasets": "hirenj/lambda-copydatasets",
-    "lambda-clustal" : "hirenj/lambda-clustal",
-    "lambda-rdatasets" : "hirenj/lambda-rdatasets",
-    "lambda-update_metadata" : "hirenj/lambda-update_metadata",
-    "lambda-gatordata-postprocess" : "hirenj/lambda-gatordata-postprocess"
+    "lambda-gatordata": "hirenj/lambda-gatordata",
+    "lambda-gatordata-postprocess": "hirenj/lambda-gatordata-postprocess",
+    "lambda-grantauths": "hirenj/lambda-grantauths",
+    "lambda-rdatasets": "hirenj/lambda-rdatasets",
+    "lambda-readuserconf": "hirenj/lambda-readuserconf",
+    "lambda-update_metadata": "hirenj/lambda-update_metadata"
   },
   "repository": {
     "type": "git",
