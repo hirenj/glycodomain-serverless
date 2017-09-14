@@ -114,4 +114,10 @@ module.exports = function (grunt) {
         });
 
     });
+
+    // Create a client for the resource server
+    // ***************************************
+    // Create client in Auth0
+    // Get client ID from auth0
+    // Add auth0 client ID to the limited user plan / unlimited user plan
 }
