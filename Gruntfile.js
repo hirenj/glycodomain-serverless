@@ -211,17 +211,19 @@ var fix_deployment_dependency = function(template) {
 }
 
 module.exports = function(grunt) {
-	require('load-grunt-tasks')(grunt);
-
-	grunt.loadNpmTasks('grunt-confirm');
-
 
 	AWS.config.update({region:'us-east-1'});
-
 
 	if (grunt.option('region')) {
 		AWS.config.update({region:grunt.option('region')});
 	}
+
+	require('load-grunt-tasks')(grunt);
+
+	grunt.loadNpmTasks('grunt-confirm');
+
+	require('./tasks/auth0init')(grunt);
+
 
 	cloudformation = new AWS.CloudFormation();
 	s3 = new AWS.S3();
