@@ -7,7 +7,8 @@
       "Type" : "AWS::ApiGateway::RestApi",
       "Properties" : {
         "Description" : "GatorData REST api",
-        "Name" : "GatorData REST api"
+        "Name" : "GatorData REST api",
+        "BinaryMediaTypes" : ["application~1octet-stream"]
       }
     },
     "authLoginhandler": {
