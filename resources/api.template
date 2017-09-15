@@ -123,10 +123,16 @@
             "ResponseParameters" : {},
             "ResponseTemplates" : {},
             "StatusCode" : 200
+          },
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "SelectionPattern" : ".*Unauthorized.*",
+            "StatusCode" : 401
           }],
           "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" }, "/invocations" ] ]}
         },
-        "MethodResponses" : [{"StatusCode" : 200 }]
+        "MethodResponses" : [{"StatusCode" : 200 },{"StatusCode": 401, "ResponseParameters" : {"method.response.header.Access-Control-Allow-Origin": true}}]
       }
     },
     "dataApiExchangeTokenPOSTPermission": {
@@ -527,6 +533,30 @@
                     "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
                      "/*/POST/tools/clustal"]]
                     }
+        }
+    },
+    "GatewayResponse404": {
+        "Type": "AWS::ApiGateway::GatewayResponse",
+        "Properties": {
+            "ResponseParameters": {
+                "gatewayresponse.header.Access-Control-Allow-Origin": "'*'",
+                "gatewayresponse.header.Access-Control-Allow-Headers": "'*'"
+            },
+            "ResponseType": "MISSING_AUTHENTICATION_TOKEN",
+            "RestApiId": {"Ref": "dataApi"},
+            "StatusCode": "404"
+        }
+    },
+    "GatewayResponse401": {
+        "Type": "AWS::ApiGateway::GatewayResponse",
+        "Properties": {
+            "ResponseParameters": {
+                "gatewayresponse.header.Access-Control-Allow-Origin": "'*'",
+                "gatewayresponse.header.Access-Control-Allow-Headers": "'*'"
+            },
+            "ResponseType": "UNAUTHORIZED",
+            "RestApiId": {"Ref": "dataApi"},
+            "StatusCode": "401"
         }
     },
     "productionDeployment": {
