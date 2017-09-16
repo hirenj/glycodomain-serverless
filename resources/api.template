@@ -119,6 +119,7 @@
         "ResourceId": { "Ref" : "dataApiDoiDoi" },
         "HttpMethod": "GET",
         "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
         "AuthorizerId" : { "Ref" : "authDatahandler" },
         "RequestParameters" : { "method.request.header.Authorization" : true,
                                 "method.request.path.doi" : true },
@@ -167,6 +168,7 @@
         "ResourceId": { "Ref" : "dataApiMetadata" },
         "HttpMethod": "GET",
         "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
         "AuthorizerId" : { "Ref" : "authDatahandler" },
         "RequestParameters" : { "method.request.header.Authorization" : true },
         "Integration": {
@@ -238,6 +240,7 @@
         "ResourceId": { "Ref" : "dataApiDataLatestDatasetAcc" },
         "HttpMethod": "GET",
         "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
         "AuthorizerId" : { "Ref" : "authDatahandler" },
         "RequestParameters" : { "method.request.header.Authorization" : true,
                                 "method.request.path.dataset" : true,
@@ -295,6 +298,7 @@
         "ResourceId": { "Ref" : "dataApiDataLatestCombinedAcc" },
         "HttpMethod": "GET",
         "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
         "AuthorizerId" : { "Ref" : "authDatahandler" },
         "RequestParameters" : { "method.request.header.Authorization" : true,
                                 "method.request.path.acc" : true },
@@ -351,6 +355,7 @@
         "ResourceId": { "Ref" : "dataApiDataLatestHomologyAcc" },
         "HttpMethod": "GET",
         "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
         "AuthorizerId" : { "Ref" : "authDatahandler" },
         "RequestParameters" : { "method.request.header.Authorization" : true,
                                 "method.request.path.acc" : true },
@@ -407,6 +412,7 @@
         "ResourceId": { "Ref" : "dataApiDataLatestUniprotAcc" },
         "HttpMethod": "GET",
         "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
         "AuthorizerId" : { "Ref" : "authDatahandler" },
         "RequestParameters" : { "method.request.path.acc" : true },
         "Integration": {
@@ -525,6 +531,18 @@
         "DeploymentId": { "Ref": "productionDeployment" },
         "Variables": { "Stack": { "Ref": "AWS::StackName" } },
         "MethodSettings": []
+      }
+    },
+    "publicWebsiteUsagePlan" : {
+      "Type" : "AWS::ApiGateway::UsagePlan",
+      "Properties" : {
+        "ApiStages" : [ {"ApiId" : { "Ref" : "dataApi" }, "Stage" : { "Ref" : "Production" }} ],
+        "Description" : "Public website API usage plan",
+        "Throttle" : {
+          "BurstLimit" : 200,
+          "RateLimit" : 100
+        },
+        "UsagePlanName" : "public_website_usage"
       }
     }
   }
