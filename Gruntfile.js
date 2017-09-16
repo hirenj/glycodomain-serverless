@@ -65,6 +65,7 @@ var enable_cors = function(template) {
 		if (options_method.Properties.RequestParameters) {
 			delete options_method.Properties.RequestParameters['method.request.header.Authorization'];
 		}
+		delete options_method.Properties.ApiKeyRequired;
 		options_method.Properties.Integration = {'Type' : 'MOCK'};
 		options_method.Properties.Integration.RequestTemplates = { "application/json" : "{\"statusCode\": 200}" };
 		options_method.Properties.Integration.IntegrationResponses = [
