@@ -60,6 +60,10 @@ var enable_cors = function(template) {
 		if (resource.Properties.HttpMethod === 'HEAD') {
 			return;
 		}
+		var method_base = method.replace(/POST/,'').replace(/GET/,'');
+		if (template.Resources[method_base+'POSTOPTIONS'] || template.Resources[method_base+'GETOPTIONS']) {
+			return;
+		}
 		var options_method = JSON.parse(JSON.stringify(resource));
 		options_method.Properties.HttpMethod = 'OPTIONS';
 		if (options_method.Properties.RequestParameters) {

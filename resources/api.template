@@ -96,6 +96,52 @@
                     }
         }
     },
+    "dataApiLoginPOST": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiLogin" },
+        "HttpMethod": "POST",
+        "AuthorizationType": "CUSTOM",
+        "ApiKeyRequired" : true,
+        "AuthorizerId" : { "Ref" : "authLoginhandler" },
+        "RequestParameters" : { "method.request.header.Authorization" : true },
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod" : "POST",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "RequestParameters" : {},
+          "RequestTemplates" : { "application/json" : "{ \"Authorization\" : \"$input.params().header.get('Authorization')\" }"},
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "StatusCode" : 200
+          },
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "SelectionPattern" : ".*Unauthorized.*",
+            "StatusCode" : 401
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{ "Ref" : "AWS::Region" },":lambda:path/2015-03-31/functions/", "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" }, "/invocations" ] ]}
+        },
+        "MethodResponses" : [{"StatusCode" : 200 },{"StatusCode": 401, "ResponseParameters" : {"method.response.header.Access-Control-Allow-Origin": true}}]
+      }
+    },
+    "dataApiLoginPOSTPermission": {
+        "Type" : "AWS::Lambda::Permission",
+        "Properties" : {
+            "Action":"lambda:invokeFunction",
+            "FunctionName": { "Fn::Join" :  [ "", [ "arn:aws:lambda:",{ "Ref" : "AWS::Region" },":", { "Ref" : "AWS::AccountId" } , ":function:", { "Ref" : "exchangetoken" } ] ]},
+            "Principal": "apigateway.amazonaws.com",
+            "SourceArn": {
+                "Fn::Join": ["", [
+                    "arn:aws:execute-api:", {"Ref" : "AWS::Region" } ,":", {"Ref" : "AWS::AccountId" }, ":", {"Ref" : "dataApi" },
+                     "/*/POST/login"]]
+                    }
+        }
+    },
     "dataApiDoi" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
