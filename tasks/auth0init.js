@@ -92,7 +92,7 @@ module.exports = function (grunt) {
         };
 
         let get_client = read_stack_parameters(stack).then(function(params) {
-          data.identifier = params.AUTH0_API_IDENTIFIER || `https://${stack}.glycocode.com`;
+          data.identifier = params.AUTH0APIIDENTIFIER || `https://${stack}.glycocode.com`;
           return params.AUTH0DOMAIN;
         }).then( domain => get_management_client(domain,'create:resource_servers read:resource_servers') );
 
