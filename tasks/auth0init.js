@@ -78,9 +78,6 @@ module.exports = function (grunt) {
         let done = this.async();
         let opts = this.options(DEFAULTS);
 
-        let get_client = read_stack_parameters(stack).then(function(params) {
-          return params.AUTH0DOMAIN;
-        }).then( token => get_management_client(token,'create:resource_servers read:resource_servers') );
 
         let data = {
           "name": `${stack} stage auth server`,
@@ -93,6 +90,12 @@ module.exports = function (grunt) {
           "allow_offline_access": true,
           "skip_consent_for_verifiable_first_party_clients": true
         };
+
+        let get_client = read_stack_parameters(stack).then(function(params) {
+          data.identifier = params.AUTH0_API_IDENTIFIER || `https://${stack}.glycocode.com`;
+          return params.AUTH0DOMAIN;
+        }).then( domain => get_management_client(domain,'create:resource_servers read:resource_servers') );
+
         get_client.then( management => {
           management.resourceServers.create(data, function (err) {
               if (err) {
