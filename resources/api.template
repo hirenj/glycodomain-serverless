@@ -142,6 +142,55 @@
                     }
         }
     },
+    "dataApiLoginConfig" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref": "dataApiLogin" },
+        "PathPart": "config"
+      }
+    },
+    "dataApiLoginConfigGET": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": {
+          "Ref": "dataApi"
+        },
+        "ResourceId": {
+          "Ref": "dataApiLoginConfig"
+        },
+        "HttpMethod": "GET",
+        "AuthorizationType": "NONE",
+        "RequestParameters": {
+        },
+        "Integration": {
+          "Type": "MOCK",
+          "RequestTemplates": {
+            "application/json": "{ \"statusCode\" : 200 }"
+          },
+          "IntegrationResponses": [
+            {
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'"
+              },
+              "ResponseTemplates": {
+                "application/json": { "Fn::Join" :  [ "", ["{ \"API_AUDIENCE\" : \"",{"Ref": "AUTH0APIIDENTIFIER"},"\", \"AUTH0_DOMAIN\" : \"",{"Ref": "AUTH0DOMAIN"},"\"  }" ] ] }
+
+              },
+              "StatusCode": 200
+            }
+          ]
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": 200,
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Origin": true
+            }
+          }
+        ]
+      }
+    },
     "dataApiDoi" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
