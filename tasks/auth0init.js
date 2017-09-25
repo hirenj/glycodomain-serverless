@@ -64,6 +64,15 @@ const get_management_client = function(auth0domain,scope) {
     });
 };
 
+const email_script = function(user, context, callback) {
+
+  // add custom claims to access token
+  context.accessToken['http://glycocode/email'] = user.email;
+  context.idToken['http://glycocode/userName'] = user.userPrincipalName;
+
+  callback(null, user, context);
+};
+
 module.exports = function (grunt) {
 
     cloudformation = new AWS.CloudFormation();
@@ -94,25 +103,37 @@ module.exports = function (grunt) {
         let get_client = read_stack_parameters(stack).then(function(params) {
           data.identifier = params.AUTH0APIIDENTIFIER || `https://${stack}.glycocode.com`;
           return params.AUTH0DOMAIN;
-        }).then( domain => get_management_client(domain,'create:resource_servers read:resource_servers') );
+        }).then( domain => get_management_client(domain,'create:resource_servers read:resource_servers create:rules') );
 
         get_client.then( management => {
-          management.resourceServers.create(data, function (err) {
-              if (err) {
-                  // Handle error.
-                  console.log(err);
-              }
-              done();
+          return new Promise(function(resolve,reject) {
+            management.resourceServers.create(data, function (err) {
+                if (err && err.statusCode !== 409) {
+                  reject(err);
+                  return;
+                }
+                resolve(management);
+            });
+          });
+        }).then( (management) => {
+          return new Promise(function(resolve,reject) {
+            management.rules.create({"name" : "updateemails", "script" : email_script.toString(), "enabled": true }, function (err) {
+                if (err && err.statusCode !== 409) {
+                  reject(err);
+                  return;
+                }
+                resolve(management);
+            });
           });
         }).catch( err => {
           if (err.message === 'Missing credentials') {
             console.log("No Auth0 credentials, skipping API creation");
-            done();
             return;
           }
           if (err.statusCode !== 409) {
             console.log(err);
           }
+        }).then( () => {
           done();
         });
 
