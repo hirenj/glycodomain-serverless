@@ -25,8 +25,9 @@ rm -rf node_modules
 for module in $submodules; do
 	echo "Setting up $module"
 	if [ -z "$setup_grunt" ]; then
-		npm install grunt --production
+		npm install grunt@0.4.5 --production
 		npm link grunt
+		setup_grunt=1
 	fi
 	if [ ! -d "../$module" ]; then
 		echo "Cloning $module"
@@ -50,7 +51,7 @@ for module in $submodules; do
 		fi
 		echo "Installing with target_platform $OS arch x64"
 		npm install --target_platform=$OS --target_arch=x64
-		npm link
+		npm link --target_platform=$OS --target_arch=x64
 	)
 	npm link $module
 done
