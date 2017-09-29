@@ -257,6 +257,7 @@ module.exports = function(grunt) {
 		type = type ? type : 'patch';     // Default release type
 		grunt.task.run('bumpup:' + type); // Bump up the version
 		grunt.task.run('tagrelease');     // Commit & tag the release
+		grunt.task.run('releaseLambda');
 	});
 
 	grunt.registerTask('releaseLambda', function () {
