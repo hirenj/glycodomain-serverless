@@ -244,7 +244,11 @@ module.exports = function(grunt) {
 			}
 		},
 		bumpup: { options : { updateProps: { pkg: 'package.json' }}, file: 'package.json' },
-		tagrelease: '<%= pkg.version %>',
+		tagrelease: {
+			version: '<%= pkg.version %>',
+			commit: true,
+			file: 'package.json'
+		},
 		grunt: {
 		}
 	});
@@ -253,6 +257,41 @@ module.exports = function(grunt) {
 		type = type ? type : 'patch';     // Default release type
 		grunt.task.run('bumpup:' + type); // Bump up the version
 		grunt.task.run('tagrelease');     // Commit & tag the release
+	});
+
+	grunt.registerTask('releaseLambda', function () {
+		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		lambda_modules.forEach(function(module) {
+			grunt.task.run('taglambda:'+module);
+		});
+	});
+	grunt.registerTask('taglambda', function (dir) {
+		var version = grunt.file.readJSON('package.json').version;
+		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		var done = this.async();
+
+		grunt.log.writeln('tagging ' + dir);
+
+		grunt.util.spawn({
+			cmd: 'git',
+			args:['tag','-a','glycodomain-'+version+'','-m','"Release glycodomain-'+version+'"'],
+			opts: {
+				cwd: dir
+			}
+		},
+
+		function(err, result, code) {
+			if (err == null) {
+				grunt.log.writeln('Tagged ' + dir);
+				grunt.log.writeln(result.stdout);
+				done();
+			}
+			else {
+				grunt.log.writeln('Tagging ' + dir + ' failed: ' + code);
+				grunt.log.writeln(result.stderr);
+				done(false);
+			}
+		});
 	});
 
 	grunt.registerTask('uploadlambda', function(dir) {
