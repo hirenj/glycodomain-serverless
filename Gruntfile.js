@@ -258,6 +258,7 @@ module.exports = function(grunt) {
 		grunt.task.run('bumpup:' + type); // Bump up the version
 		grunt.task.run('tagrelease');     // Commit & tag the release
 		grunt.task.run('releaseLambda');
+		grunt.task.run('pushLambdas');
 	});
 
 	grunt.registerTask('releaseLambda', function () {
@@ -294,6 +295,42 @@ module.exports = function(grunt) {
 			}
 		});
 	});
+
+	grunt.registerTask('pushLambdas', function () {
+		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		lambda_modules.forEach(function(module) {
+			grunt.task.run('pushLambda:'+module);
+		});
+	});
+	grunt.registerTask('pushLambda', function (dir) {
+		var version = grunt.file.readJSON('package.json').version;
+		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		var done = this.async();
+
+		grunt.log.writeln('pushing ' + dir);
+
+		grunt.util.spawn({
+			cmd: 'git',
+			args:['push','--follow-tags'],
+			opts: {
+				cwd: dir
+			}
+		},
+
+		function(err, result, code) {
+			if (err == null) {
+				grunt.log.writeln('Pushed ' + dir);
+				grunt.log.writeln(result.stdout);
+				done();
+			}
+			else {
+				grunt.log.writeln('Pushing ' + dir + ' failed: ' + code);
+				grunt.log.writeln(result.stderr);
+				done(false);
+			}
+		});
+	});
+
 
 	grunt.registerTask('uploadlambda', function(dir) {
 		var done = this.async();
