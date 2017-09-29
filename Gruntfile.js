@@ -2,7 +2,6 @@
  */
 'use strict';
 
-require('es6-promise').polyfill();
 var AWS = require('aws-sdk');
 var is_new_template = false;
 
@@ -226,6 +225,7 @@ module.exports = function(grunt) {
 	require('load-grunt-tasks')(grunt);
 
 	grunt.loadNpmTasks('grunt-confirm');
+	grunt.loadNpmTasks('grunt-bumpup');
 
 	require('./tasks/auth0init')(grunt);
 
@@ -243,20 +243,16 @@ module.exports = function(grunt) {
 				}
 			}
 		},
+		bumpup: { options : { updateProps: { pkg: 'package.json' }}, file: 'package.json' },
+		tagrelease: '<%= pkg.version %>',
 		grunt: {
-			deploy_jwt: {
-				gruntfile: 'node_modules/lambda-jwt/Gruntfile.js',
-				task: 'deploy'
-			},
-			deploy_syncgroups: {
-				gruntfile: 'node_modules/lambda-syncgroups/Gruntfile.js',
-				task: 'deploy'
-			},
-			deploy_gatordata: {
-				gruntfile: 'node_modules/lambda-gatordata/Gruntfile.js',
-				task: 'deploy'
-			}
 		}
+	});
+
+	grunt.registerTask('release', function (type) {
+		type = type ? type : 'patch';     // Default release type
+		grunt.task.run('bumpup:' + type); // Bump up the version
+		grunt.task.run('tagrelease');     // Commit & tag the release
 	});
 
 	grunt.registerTask('uploadlambda', function(dir) {
