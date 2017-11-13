@@ -63,14 +63,6 @@
         "PathPart": "contrib"
       }
     },
-    "dataApiRepositoryTokenTokenSrcContribPath" : {
-      "Type": "AWS::ApiGateway::Resource",
-      "Properties": {
-        "RestApiId": { "Ref": "dataApi" },
-        "ParentId": { "Ref" : "dataApiRepositoryTokenTokenSrcContrib" },
-        "PathPart": "{path}"
-      }
-    },
     "dataApiRepositoryTokenTokenSrcContribPackages" : {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
@@ -149,6 +141,14 @@
         "MethodResponses" : [{"StatusCode" : 403 }]
       }
     },
+    "dataApiRepositoryTokenTokenSrcContribPath" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositoryTokenTokenSrcContrib" },
+        "PathPart": "{path+}"
+      }
+    },
     "dataApiRepositoryTokenTokenSrcContribPathGET": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
@@ -201,6 +201,45 @@
             "ResponseTemplates" : {},
             "StatusCode" : 200
           }]
+        },
+        "MethodResponses" : [{"StatusCode" : 200 }]
+      }
+    },
+    "dataApiRepositorySrcContribPath" : {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ParentId": { "Ref" : "dataApiRepositorySrcContrib" },
+        "PathPart": "{path+}"
+      }
+    },
+    "dataApiRepositorySrcContribPathPOST": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "RestApiId": { "Ref": "dataApi" },
+        "ResourceId": { "Ref" : "dataApiRepositorySrcContribPath" },
+        "HttpMethod": "POST",
+        "AuthorizationType": "CUSTOM",
+        "AuthorizerId" : { "Ref" : "authRdatasethandler" },
+        "RequestParameters" : {
+            "method.request.path.path" : true
+        },
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod" : "GET",
+          "PassthroughBehavior" : "WHEN_NO_MATCH",
+          "Credentials" : {"Fn::GetAtt" : ["ReadRDatasetsRole", "Arn"] },
+          "RequestTemplates" : {},
+          "RequestParameters" : {
+            "integration.request.path.path" : "method.request.path.path"
+          },
+          "IntegrationResponses" : [
+          {
+            "ResponseParameters" : {},
+            "ResponseTemplates" : {},
+            "StatusCode" : 200
+          }],
+          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{"Ref":"AWS::Region"},":s3:path/", {"Ref":"AWS::StackName"} ,"-gator/rdata/{path}" ] ] }
         },
         "MethodResponses" : [{"StatusCode" : 200 }]
       }
@@ -320,45 +359,6 @@
                      "/*/POST/repository/src/contrib/PACKAGES"]]
                     }
         }
-    },
-    "dataApiRepositorySrcContribPath" : {
-      "Type": "AWS::ApiGateway::Resource",
-      "Properties": {
-        "RestApiId": { "Ref": "dataApi" },
-        "ParentId": { "Ref" : "dataApiRepositorySrcContrib" },
-        "PathPart": "{path}"
-      }
-    },
-    "dataApiRepositorySrcContribPathPOST": {
-      "Type": "AWS::ApiGateway::Method",
-      "Properties": {
-        "RestApiId": { "Ref": "dataApi" },
-        "ResourceId": { "Ref" : "dataApiRepositorySrcContribPath" },
-        "HttpMethod": "POST",
-        "AuthorizationType": "CUSTOM",
-        "AuthorizerId" : { "Ref" : "authRdatasethandler" },
-        "RequestParameters" : {
-            "method.request.path.path" : true
-        },
-        "Integration": {
-          "Type": "AWS",
-          "IntegrationHttpMethod" : "GET",
-          "PassthroughBehavior" : "WHEN_NO_MATCH",
-          "Credentials" : {"Fn::GetAtt" : ["ReadRDatasetsRole", "Arn"] },
-          "RequestTemplates" : {},
-          "RequestParameters" : {
-            "integration.request.path.path" : "method.request.path.path"
-          },
-          "IntegrationResponses" : [
-          {
-            "ResponseParameters" : {},
-            "ResponseTemplates" : {},
-            "StatusCode" : 200
-          }],
-          "Uri" : { "Fn::Join" :  [ "", [ "arn:aws:apigateway:",{"Ref":"AWS::Region"},":s3:path/", {"Ref":"AWS::StackName"} ,"-gator/rdata/{path}" ] ] }
-        },
-        "MethodResponses" : [{"StatusCode" : 200 }]
-      }
     },
     "ReadRDatasetsRole": {
       "Type": "AWS::IAM::Role",
