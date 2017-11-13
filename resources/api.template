@@ -7,7 +7,7 @@
       "Type" : "AWS::ApiGateway::RestApi",
       "Properties" : {
         "Description" : "GatorData REST api",
-        "Name" : "GatorData REST api",
+        "Name" : { "Fn::Join" : [ "", [ "GatorData REST api ", { "Ref": "AWS::StackName" } ] ] },
         "BinaryMediaTypes" : ["application~1octet-stream"]
       }
     },
