@@ -178,14 +178,15 @@
           },
           {
             "ResponseParameters" : {
-              "integration.response.header.Location" : "integration.response.header.Location"
+              "method.response.header.Location" : "integration.response.header.Location"
             },
             "ResponseTemplates" : {},
+            "SelectionPattern" : "302",
             "StatusCode" : 302
           }],
           "Uri" : { "Fn::Join" :  [ "", [ "https://",{"Ref" : "dataApi"}, ".execute-api.",{ "Ref" : "AWS::Region" },".amazonaws.com/api/repository/src/contrib/{path}" ] ]}
         },
-        "MethodResponses" : [{"StatusCode" : 200 },{"StatusCode" : 302}]
+        "MethodResponses" : [{"StatusCode" : 200 },{"StatusCode" : 302, "ResponseParameters" : { "method.response.header.Location": true }}]
       }
     },
     "dataApiRepositoryTokenTokenSrcContribPathHEAD": {
@@ -232,7 +233,7 @@
             "method.request.path.path" : true
         },
         "Integration": {
-          "Type": "AWS",
+          "Type": "AWS_PROXY",
           "IntegrationHttpMethod" : "POST",
           "PassthroughBehavior" : "WHEN_NO_MATCH",
           "RequestParameters" : {},
