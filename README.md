@@ -1,34 +1,18 @@
 # glycodomain-serverless
 
+## What to do
+
+
+### Copying configs to submodule directories
 ```
-{
-   "AWSTemplateFormatVersion": "2010-09-09",
-   "Resources": {
-       "ChildStack01": {
-           "Type": "AWS::CloudFormation::Stack",
-           "Properties": {
-               "TemplateURL": "https://s3.amazonaws.com/cloudformation-templates-us-east-1/VPC.template",
-               "TimeoutInMinutes": "60"
-           }
-       },
-       "ChildStack02": {
-           "Type": "AWS::CloudFormation::Stack",
-           "Properties": {
-               "TemplateURL": "https://s3.amazonaws.com/cloudformation-templates-us-east-1/Subnet.template",
-               "Parameters": {
-                  "VpcId" : { "Fn::GetAtt" : [ "ChildStack01", "Outputs.VpcID" ] },
-               },
-               "TimeoutInMinutes": "60"
-           }
-       }
-   },
-   "Outputs": {
-       "StackRef": {
-           "Value": { "Ref": "ChildStack02" }
-       },
-       "OutputFromNestedStack": {
-           "Value": { "Fn::GetAtt": [ "ChildStack02", "Outputs.SubnetID" ]}
-       }
-   }
-}
+grunt update_configs:test
+(export AWS_REGION=eu-west-1; grunt update_configs:beta --region=eu-west-1)
+(export AWS_REGION=eu-west-1; grunt update_configs:prod --region=eu-west-1)
+```
+
+### Deploying
+```
+grunt deploy:test
+(export AWS_REGION=eu-west-1; grunt deploy:beta --region=eu-west-1)
+(export AWS_REGION=eu-west-1; grunt deploy:prod --region=eu-west-1)
 ```
