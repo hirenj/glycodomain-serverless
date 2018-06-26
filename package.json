@@ -1,6 +1,6 @@
 {
   "name": "glycodomain-serverless",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "AWS / Lambda backed implementation of Glycodomain data API",
   "main": "index.js",
   "scripts": {
