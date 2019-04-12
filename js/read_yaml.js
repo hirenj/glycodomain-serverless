@@ -1,5 +1,3 @@
-// const { yamlParse, yamlDump } = require('yaml-cfn');
-
 const CLOUDFORMATION_SCHEMA = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA;
 
 const assert = require('assert');
@@ -210,3 +208,5 @@ let generated_yaml = yaml.safeLoad(generated_yaml_string,{schema: CLOUDFORMATION
 let correct_yaml = yaml.safeLoad(fs.readFileSync('target_template_short.yaml'), {schema: CLOUDFORMATION_SCHEMA });
 
 assert.deepEqual(generated_yaml, correct_yaml);
+
+fs.writeFileSync('glycodomain.template',generated_yaml_string);
