@@ -12,8 +12,8 @@ Resources:
         - Name: !Sub '${AWS::StackName}.${DomainName}'
           Type: A
           AliasTarget:
-            HostedZoneId: Z2FDTNDATAQYW2
-            DNSName: !GetAtt 'www.DomainName'
+            HostedZoneId: Z2FDTNDATAQYW2 # This magic HostedZoneId is for CloudFormation
+            DNSName: !GetAtt 'www.DomainName' # We should point to the domain name from CloudFormation
   www:
     Type: AWS::CloudFront::Distribution
     Properties:
