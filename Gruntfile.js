@@ -50,121 +50,8 @@ var read_stack_region = function(stack) {
 	});
 };
 
-var enable_cors = function(template) {
-	var resources = Object.keys(template.Resources);
-	var methods = resources.filter(function(res) { return template.Resources[res].Type === 'AWS::ApiGateway::Method' });
-	methods.forEach(function(method) {
-		make_cors(template.Resources,method);
-		var resource = template.Resources[method];
-		if (resource.Properties.HttpMethod === 'HEAD') {
-			return;
-		}
-		var method_base = method.replace(/POST/,'').replace(/GET/,'');
-		if (template.Resources[method_base+'POSTOPTIONS'] || template.Resources[method_base+'GETOPTIONS']) {
-			return;
-		}
-		var options_method = JSON.parse(JSON.stringify(resource));
-		options_method.Properties.HttpMethod = 'OPTIONS';
-		if (options_method.Properties.RequestParameters) {
-			delete options_method.Properties.RequestParameters['method.request.header.Authorization'];
-		}
-		delete options_method.Properties.ApiKeyRequired;
-		options_method.Properties.Integration = {'Type' : 'MOCK'};
-		options_method.Properties.Integration.RequestTemplates = { "application/json" : "{\"statusCode\": 200}" };
-		options_method.Properties.Integration.IntegrationResponses = [
-		{
-			"ResponseParameters": {
-				"method.response.header.Access-Control-Allow-Origin": "'*'",
-				"method.response.header.Access-Control-Allow-Headers" : "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
-				"method.response.header.Access-Control-Allow-Credentials" : "'true'",
-				"method.response.header.Access-Control-Allow-Max-Age" : "'1800'",
-				"method.response.header.Access-Control-Allow-Expose-Headers" : "''",
-				"method.response.header.Access-Control-Allow-Methods" : "'"+resource.Properties.HttpMethod+",OPTIONS'"
-			},
-			"ResponseTemplates": { 'application/json' : '' },
-			"StatusCode": 200
-		}];
-		options_method.Properties.MethodResponses = [
-		{
-			"ResponseParameters": {
-				"method.response.header.Access-Control-Allow-Origin": true,
-				"method.response.header.Access-Control-Allow-Headers": true,
-				"method.response.header.Access-Control-Allow-Credentials": true,
-				"method.response.header.Access-Control-Allow-Max-Age": true,
-				"method.response.header.Access-Control-Allow-Expose-Headers": true,
-				"method.response.header.Access-Control-Allow-Methods": true
-			},
-			"StatusCode": 200
-		}];
-		options_method.Properties.AuthorizationType = "NONE";
-		delete options_method.Properties.AuthorizerId;
-		template.Resources[method+'OPTIONS'] = options_method;
-	});
-};
-
-var make_cors = function(resources,method) {
-	var resource  = resources[method];
-	resource.Properties.Integration.IntegrationResponses.forEach(function(int_resp) {
-		int_resp.ResponseParameters = int_resp.ResponseParameters || {};
-		int_resp.ResponseParameters['method.response.header.Access-Control-Allow-Origin'] = "'*'";
-	});
-	resource.Properties.MethodResponses.forEach(function(method_resp) {
-		method_resp.ResponseParameters = method_resp.ResponseParameters || {};
-		method_resp.ResponseParameters['method.response.header.Access-Control-Allow-Origin'] = true;
-	});
-};
-
-var find_keys = function(keyname, object) {
-	if (Array.isArray(object)) {
-		var results = object.map(find_keys.bind(null,keyname)).reduce( (a, b) => {
-			a = a || [];
-			b = b || [];
-			return a.concat(b);
-		},[]);
-		return results.filter( val => val );
-	}
-	var results = [];
-	if (typeof object == 'object') {
-		Object.keys(object).forEach(key => {
-			if (key === keyname) {
-				results.push(object[key]);
-			} else {
-				results = results.concat(find_keys(keyname,object[key]));
-			}
-		});
-		return results.filter( val => val );
-	}
-	return;
-}
-
-var find_non_aws_refs = function(resources) {
-	var vals = find_keys('Ref',resources);
-	return vals.filter( val => {
-		return ! val.match(/^AWS::/);
-	}).filter(onlyUnique);
-};
-
 var onlyUnique = function(value, index, self) {
 	return self.indexOf(value) === index;
-};
-
-var fill_parameters = function(template) {
-	var current_params = Object.keys(template.Parameters || {});
-	var defined_resources = Object.keys(template.Resources || {});
-	var references = find_non_aws_refs(template.Resources);
-	current_params.forEach(param => {
-		if (defined_resources.indexOf(param) >= 0) {
-			delete template.Parameters[param];
-		}
-	});
-	references.forEach( ref => {
-		if (defined_resources.indexOf(ref) < 0 && current_params.indexOf(ref) < 0) {
-			template.Parameters[ref] = {
-				"Type" : "String",
-				"Description": "Parameter " +ref
-			}
-		}
-	});
 };
 
 var make_lookup = function(resources) {
@@ -208,11 +95,6 @@ var summarise_resources = function(stack,resources) {
 						'rule'  : make_lookup(rule) };
 	return stack_conf;
 };
-
-var fix_deployment_dependency = function(template) {
-	var methods = Object.keys(template.Resources).filter( resource =>  template.Resources[resource].Type == 'AWS::ApiGateway::Method' );
-	template.Resources['productionDeployment'].DependsOn = methods;
-}
 
 module.exports = function(grunt) {
 
@@ -463,88 +345,6 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('build_cloudformation', 'Build cloudformation template',function() {
-		var template_paths = ['empty.template'];
-		template_paths = template_paths.concat(grunt.file.expand('node_modules/*/**/resources/*.template'));
-		template_paths = template_paths.concat(grunt.file.expand('resources/*.template'));
-		var templates = template_paths.map(function(template) {
-			return grunt.file.readJSON(template);
-		});
-		var common_template = templates.reduce(function(prev,curr) {
-			if (! prev) {
-				return curr;
-			}
-			if ( ! prev.Resources ) {
-				prev.Resources = {};
-			}
-			Object.keys(curr.Resources).forEach(function(key) {
-				if (prev.Resources[key] && prev.Resources[key].Type == 'AWS::S3::Bucket') {
-					var wanted = null;
-					var alternative = null;
-					if (prev.Resources[key].Properties.BucketName) {
-						wanted = prev.Resources[key];
-						alternative = curr.Resources[key];
-					}
-					if (curr.Resources[key].Properties.BucketName) {
-						wanted = curr.Resources[key];
-						alternative = prev.Resources[key];
-					}
-					prev.Resources[key] = wanted;
-					if (! wanted.Properties.NotificationConfiguration && alternative.Properties.NotificationConfiguration ) {
-						wanted.Properties.NotificationConfiguration = {}
-					}
-					wanted.Properties.NotificationConfiguration.LambdaConfigurations = (wanted.Properties.NotificationConfiguration.LambdaConfigurations || []).concat( alternative.Properties.NotificationConfiguration.LambdaConfigurations );
-					wanted.DependsOn = (wanted.DependsOn || []).concat(alternative.DependsOn)
-					curr.Resources[key] = prev.Resources[key];
-				}
-				if (prev.Resources[key] && prev.Resources[key].Type == 'AWS::SNS::Topic') {
-					curr.Resources[key].Properties.Subscription = curr.Resources[key].Properties.Subscription.concat(prev.Resources[key].Properties.Subscription);
-				}
-				prev.Resources[key] = curr.Resources[key];
-			});
-			if ( ! prev.Outputs ) {
-				prev.Outputs = {};
-			}
-			Object.keys(curr.Outputs || {}).forEach(function(key) {
-				prev.Outputs[key] = curr.Outputs[key];
-			});
-			if ( ! prev.Parameters ) {
-				prev.Parameters = {};
-			}
-			Object.keys(curr.Parameters || {}).forEach(function(key) {
-				prev.Parameters[key] = curr.Parameters[key];
-			});
-			return prev;
-		});
-		if (grunt.option('break_circular')) {
-			Object.keys(common_template.Resources).forEach(function(resource_name) {
-				var resource = common_template.Resources[resource_name];
-				if (resource.Metadata && resource.Metadata.break_circular) {
-					Object.keys(resource.Metadata.break_circular).forEach(function(path_string) {
-						var path = path_string.split('.').map(function(el) {
-							if (! isNaN(parseInt(el))) {
-								return parseInt(el);
-							}
-							return el;
-						});
-						var value = resource.Metadata.break_circular[path_string];
-						var target = resource;
-						while (path.length > 1) {
-							target = target[path.shift()];
-						}
-						if (value) {
-							target[path[0]] = value;
-						} else {
-							delete target[path[0]];
-						}
-					});
-					resource.Metadata.break_circular = true;
-				}
-			});
-		}
-		enable_cors(common_template);
-		fill_parameters(common_template);
-		fix_deployment_dependency(common_template);
-		grunt.file.write('glycodomain.template',JSON.stringify(common_template,null,'  '));
 	});
 
 	grunt.registerTask('deploy','Deploy software to AWS',function(stack) {
