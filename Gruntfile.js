@@ -285,7 +285,7 @@ module.exports = function(grunt) {
 	grunt.registerTask('get_current_template','Get cloudformation template',function(stack) {
 		var done = this.async();
 		cloudformation.getTemplate({'StackName' : stack}).promise().then((response) => {
-			grunt.file.write(stack+'_last.template',JSON.stringify(JSON.parse(response.data.TemplateBody),null,'  '));
+			grunt.file.write(stack+'_last.template',response.data.TemplateBody,null,'  ');
 			done();
 		}).catch( err => {
 			console.error(err);
@@ -336,7 +336,11 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('diff_template','Diff two CloudFormation templates',function(stack) {
-		let diff = require('rus-diff').rusDiff(grunt.file.readJSON(stack+'_last.template'),grunt.file.readJSON('glycodomain.template'));
+		const CLOUDFORMATION_SCHEMA = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA;
+		const yaml = require('js-yaml');
+		let last_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read(stack+'_last.template'),{schema: CLOUDFORMATION_SCHEMA })));
+		let current_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read('glycodomain.template'),{schema: CLOUDFORMATION_SCHEMA })));
+		let diff = require('rus-diff').rusDiff(last_data,current_data);
 		if (Object.keys(diff).length !== 0) {
 			grunt.log.writeln(JSON.stringify(diff));
 			grunt.option('generate-changeset',true);
