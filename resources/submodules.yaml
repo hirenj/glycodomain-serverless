@@ -1,0 +1,10 @@
+modules:
+  certificates: !!inc/file 'node_modules/lambda-certificatemanager/resources/certificates.yaml'
+  clustal: !!inc/file 'node_modules/lambda-clustal/resources/clustal.yaml'
+  copydatasets: !!inc/file 'node_modules/lambda-copydatasets/resources/copydatasets.yaml'
+  postprocess: !!inc/file 'node_modules/lambda-gatordata-postprocess/resources/postprocess.yaml'
+  gatordata: !!inc/file 'node_modules/lambda-gatordata/resources/gatordata.yaml'
+  auth: !!inc/file 'node_modules/lambda-grantauths/resources/auth.yaml'
+  rdatasets: !!inc/file 'node_modules/lambda-rdatasets/resources/rdatasets.yaml'
+  readuserconf: !!inc/file 'node_modules/lambda-readuserconf/resources/readuserconf.yaml'
+  updatemetadata: !!inc/file 'node_modules/lambda-update_metadata/resources/update_metadata.yaml'

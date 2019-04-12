@@ -1,0 +1,4343 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  AUTH0DOMAIN:
+    Type: String
+    Default: ''
+    Description: Auth0 domain for authentication (i.e. just 'example' from a domain
+      of 'example.auth0.com')
+  DEFAULTREADCAPACITY:
+    Type: Number
+    Default: 1
+    Description: Default capacity for reading from the data dynamodb table
+  ENABLELOGINGOOGLEACCOUNTS:
+    Type: String
+    Default: ''
+    Description: Enable data access using Google accounts
+  AUTH0APIIDENTIFIER:
+    Type: String
+    Default: ''
+    Description: Audience / Resource server identifier to match for validating access
+      tokens
+  HostedZone:
+    Type: String
+    Description: Parameter HostedZone
+  DomainName:
+    Type: String
+    Description: Parameter DomainName
+Resources:
+  CertsLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CertsLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaRotateCertificatesRole
+        - Ref: LambdaUpdateCertificatesRole
+    DependsOn:
+      - LambdaRotateCertificatesRole
+      - LambdaUpdateCertificatesRole
+  LambdaUpdateCertificatesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteCertificatesConfig
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaRotateCertificatesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteCertificatesConfig
+        - Ref: UpdateFunctions
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  updateCertificates:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.updateCertificates = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: updateCertificates
+      Handler: index.updateCertificates
+      Environment:
+        Variables:
+          AUTH0_DOMAIN:
+            Ref: AUTH0DOMAIN
+      Role:
+        Fn::GetAtt:
+          - LambdaUpdateCertificatesRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 60
+    DependsOn: LambdaUpdateCertificatesRole
+  rotateCertificates:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.rotateCertificates = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: rotateCertificates
+      Handler: index.rotateCertificates
+      Role:
+        Fn::GetAtt:
+          - LambdaRotateCertificatesRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 512
+      Timeout: 300
+    DependsOn: LambdaRotateCertificatesRole
+  UpdateFunctions:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: UpdateFunctions
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: UpdateFunctions
+            Effect: Allow
+            Action:
+              - lambda:GetFunction
+              - lambda:UpdateFunctionCode
+            Resource:
+              - Fn::GetAtt:
+                  - exchangetoken
+                  - Arn
+              - Fn::GetAtt:
+                  - datahandler
+                  - Arn
+              - Fn::GetAtt:
+                  - rdatasethandler
+                  - Arn
+              - Fn::GetAtt:
+                  - loginhandler
+                  - Arn
+  WriteCertificatesConfig:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: WriteCertificatesConfig
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteCertificatesConfig
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:PutObjectAcl
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: dataBucket
+                    - /conf/authcerts
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: dataBucket
+                    - /conf/localcerts
+  updateCertificatesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Join:
+          - ''
+          - - updateCertificatesRule
+            - '-'
+            - Ref: AWS::StackName
+      Description: updateCertificates triggering event
+      ScheduleExpression: rate(12 hours)
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - updateCertificates
+              - Arn
+          Id: updateCertificates
+  rotateCertificatesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Join:
+          - ''
+          - - rotateCertificatesRule
+            - '-'
+            - Ref: AWS::StackName
+      Description: rotateCertificates triggering event
+      ScheduleExpression: rate(6 hours)
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - rotateCertificates
+              - Arn
+          Id: rotateCertificates
+  LambdaUpdateCertificatesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - updateCertificates
+          - Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - arn:aws:events
+            - ':'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - rule/updateCertificatesRule
+            - '-'
+            - Ref: AWS::StackName
+    Metadata:
+      Comment: Used to update the pubkeys from auth providers
+  LambdaRotateCertificatesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - rotateCertificates
+          - Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - arn:aws:events
+            - ':'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - rule/rotateCertificatesRule
+            - '-'
+            - Ref: AWS::StackName
+    Metadata:
+      Comment: Used to rotate certificates in deployed lambda functions
+  ClustalLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AuthLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaClustalRole
+    DependsOn:
+      - LambdaClustalRole
+  LambdaClustalRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns: []
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  clustal:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.exchangetoken = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: clustal
+      Handler: index.clustal
+      Role:
+        Fn::GetAtt:
+          - LambdaClustalRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 512
+      Timeout: 20
+    DependsOn: LambdaClustalRole
+  copyDatasets:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.copyDatasets = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: copyDatasets
+      Handler: index.copyDatasets
+      Role:
+        Fn::GetAtt:
+          - LambdaCopyDatasetsRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 300
+  LambdaCopyDatasetsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: CopyDatasetsPolicy
+        - Ref: ReadConfig
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  ReadConfig:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: ReadConfig
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadConfigFile
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: AWS::StackName
+                    - -gator
+                    - /conf/copydatasets.json
+  CopyDatasetsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: CopyDatasetsPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CopyDatasets
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: AWS::StackName
+                    - -gator
+                    - /uploads/*
+          - Sid: ListDatasets
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: AWS::StackName
+                    - -gator
+            Condition:
+              StringEquals:
+                s3:prefix: uploads/
+  ConfChangesTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Configuration Changes
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+              - readUserConf
+              - Arn
+          Protocol: lambda
+        - Endpoint:
+            Fn::GetAtt:
+              - copyDatasets
+              - Arn
+          Protocol: lambda
+  CopyDatasetsConfChangesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - copyDatasets
+          - Arn
+      Principal: sns.amazonaws.com
+      SourceArn:
+        Ref: ConfChangesTopic
+  copyDatasetsLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: copyDatasetsLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaCopyDatasetsRole
+  StatePostProcessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                Fn::Join:
+                  - ''
+                  - - states.
+                    - Ref: AWS::Region
+                    - .amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: RegisterEvents
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - Fn::GetAtt:
+                      - serialiseDataset
+                      - Arn
+                  - Fn::GetAtt:
+                      - updateMetadata
+                      - Arn
+  StatePostProcess:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        Fn::Join:
+          - "\n"
+          - - '{'
+            - '    "StartAt": "updateMetadata",'
+            - '    "States" : {'
+            - '        "updateMetadata" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - updateMetadata
+                      - Arn
+                  - '",'
+            - '            "Next" : "setSerialiserRData"'
+            - '        },'
+            - '        "setSerialiserRData": {'
+            - '          "Type": "Pass",'
+            - '          "Result": "RData",'
+            - '          "ResultPath": "$.serialiser",'
+            - '          "Next": "serialiseDatasetRData"'
+            - '        },'
+            - '        "serialiseDatasetRData" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - serialiseDataset
+                      - Arn
+                  - '",'
+            - '            "ResultPath": "$.lastoutput",'
+            - '            "Next" : "setSerialiserRDataPartial"'
+            - '        },'
+            - '        "setSerialiserRDataPartial": {'
+            - '          "Type": "Pass",'
+            - '          "Result": "RData_partial",'
+            - '          "ResultPath": "$.serialiser",'
+            - '          "Next": "serialiseDatasetRDataPartial"'
+            - '        },'
+            - '        "serialiseDatasetRDataPartial" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - serialiseDataset
+                      - Arn
+                  - '",'
+            - '            "ResultPath": "$.lastoutput",'
+            - '            "Next" : "setSerialiserTDE"'
+            - '        },'
+            - '        "setSerialiserTDE": {'
+            - '          "Type": "Pass",'
+            - '          "Result": "TDE",'
+            - '          "ResultPath": "$.serialiser",'
+            - '          "Next": "serialiseDatasetTDE"'
+            - '        },'
+            - '        "serialiseDatasetTDE" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - serialiseDataset
+                      - Arn
+                  - '",'
+            - '            "ResultPath": "$.lastoutput",'
+            - '            "Next" : "setSerialiserTDEPartial"'
+            - '        },'
+            - '        "setSerialiserTDEPartial": {'
+            - '          "Type": "Pass",'
+            - '          "Result": "TDE_partial",'
+            - '          "ResultPath": "$.serialiser",'
+            - '          "Next": "serialiseDatasetTDEPartial"'
+            - '        },'
+            - '        "serialiseDatasetTDEPartial" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - serialiseDataset
+                      - Arn
+                  - '",'
+            - '            "ResultPath": "$.lastoutput",'
+            - '            "End" : true'
+            - '        }'
+            - '    }'
+            - '}'
+      RoleArn:
+        Fn::GetAtt:
+          - StatePostProcessRole
+          - Arn
+  runPostProcess:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.runPostProcess = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: runPostProcess
+      Handler: index.runPostProcess
+      Environment:
+        Variables: {}
+      Role:
+        Fn::GetAtt:
+          - LambdaRunStatePostProcessRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 60
+    DependsOn: LambdaRunStatePostProcessRole
+  StartExecutionStatePostProcess:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: StartExecutionStatePostProcess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+              - Ref: StatePostProcess
+  LambdaRunStatePostProcessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: StartExecutionStatePostProcess
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  SplitQueueTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Events on the Split Queue
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+              - runPostProcess
+              - Arn
+          Protocol: lambda
+  RunPostProcessSplitQueueTopicPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - runPostProcess
+          - Arn
+      Principal: sns.amazonaws.com
+      SourceArn:
+        Ref: SplitQueueTopic
+  PostProcessLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: PostProcessLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaRunStatePostProcessRole
+  data:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - data
+      AttributeDefinitions:
+        - AttributeName: acc
+          AttributeType: S
+        - AttributeName: dataset
+          AttributeType: S
+      KeySchema:
+        - AttributeName: acc
+          KeyType: HASH
+        - AttributeName: dataset
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: '4'
+        WriteCapacityUnits: '1'
+  SplitQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - SplitQueue
+      VisibilityTimeout: '900'
+  splitFiles:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.splitFiles = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: splitFiles
+      Handler: index.splitFiles
+      Role:
+        Fn::GetAtt:
+          - LambdaSplitFilesRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 256
+      Timeout: 300
+    DependsOn: LambdaSplitFilesRole
+  runSplitQueue:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.runSplitQueue = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: runSplitQueue
+      Handler: index.runSplitQueue
+      Environment:
+        Variables:
+          DEFAULT_READ_CAPACITY:
+            Ref: DEFAULTREADCAPACITY
+      Role:
+        Fn::GetAtt:
+          - LambdaRunSplitQueueRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 60
+    DependsOn: LambdaRunSplitQueueRole
+  startSplitQueue:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.startSplitQueue = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: startSplitQueue
+      Handler: index.startSplitQueue
+      Environment:
+        Variables:
+          DEFAULT_READ_CAPACITY:
+            Ref: DEFAULTREADCAPACITY
+      Role:
+        Fn::GetAtt:
+          - LambdaStartSplitQueueRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 60
+    DependsOn: LambdaStartSplitQueueRole
+  stepSplitQueue:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.stepSplitQueue = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: stepSplitQueue
+      Handler: index.stepSplitQueue
+      Environment:
+        Variables:
+          DEFAULT_READ_CAPACITY:
+            Ref: DEFAULTREADCAPACITY
+      Role:
+        Fn::GetAtt:
+          - LambdaStepSplitQueueRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 512
+      Timeout: 900
+    DependsOn: LambdaStepSplitQueueRole
+  endSplitQueue:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.endSplitQueue = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: endSplitQueue
+      Handler: index.endSplitQueue
+      Environment:
+        Variables:
+          DEFAULT_READ_CAPACITY:
+            Ref: DEFAULTREADCAPACITY
+      Role:
+        Fn::GetAtt:
+          - LambdaEndSplitQueueRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 60
+    DependsOn: LambdaEndSplitQueueRole
+  datasetCleanup:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.datasetCleanup = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: datasetCleanup
+      Handler: index.datasetCleanup
+      Role:
+        Fn::GetAtt:
+          - LambdaDatasetCleanupRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 512
+      Timeout: 300
+    DependsOn: LambdaDatasetCleanupRole
+  readAllData:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.splitFile = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: readAllData
+      Handler: index.readAllData
+      Role:
+        Fn::GetAtt:
+          - LambdaReadAllDataRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 1024
+      Timeout: 3
+    DependsOn: LambdaReadAllDataRole
+  LambdaSplitFilesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteSplitQueue
+        - Ref: ReadUploaded
+        - Ref: ReadDatasets
+        - Ref: WriteDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  StateSplitQueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                Fn::Join:
+                  - ''
+                  - - states.
+                    - Ref: AWS::Region
+                    - .amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: RegisterEvents
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - Fn::GetAtt:
+                      - startSplitQueue
+                      - Arn
+                  - Fn::GetAtt:
+                      - stepSplitQueue
+                      - Arn
+                  - Fn::GetAtt:
+                      - endSplitQueue
+                      - Arn
+                  - Fn::GetAtt:
+                      - datasetCleanup
+                      - Arn
+  StateSplitQueue:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        Fn::Join:
+          - "\n"
+          - - '{'
+            - '    "StartAt": "startSplitQueue",'
+            - '    "States" : {'
+            - '        "startSplitQueue" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - startSplitQueue
+                      - Arn
+                  - '",'
+            - '            "Next" : "WaitChoice"'
+            - '        },'
+            - '        "WaitChoice" : {'
+            - '            "Type" : "Choice", '
+            - '            "Choices" : [ '
+            - '                { "Variable": "$.messageCount", "NumericGreaterThan":
+              0, "Next": "waitForCapacity" }'
+            - '                          ],'
+            - '            "Default" : "QueueChoice"'
+            - '        },'
+            - '        "waitForCapacity" : {'
+            - '            "Type" : "Wait", '
+            - '            "Seconds" : 300, '
+            - '            "Next" : "QueueChoice"'
+            - '        },'
+            - '        "QueueChoice" : {'
+            - '            "Type" : "Choice", '
+            - '            "Choices" : [ '
+            - '                { "Variable": "$.messageCount", "NumericGreaterThan":
+              0, "Next": "stepSplitQueue" }'
+            - '                          ],'
+            - '            "Default" : "datasetCleanup"'
+            - '        },'
+            - '        "stepSplitQueue" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - stepSplitQueue
+                      - Arn
+                  - '",'
+            - '            "Next" : "QueueChoice",'
+            - '            "Catch": [ {'
+            - '               "ErrorEquals": ["States.ALL"],'
+            - '               "Next": "endSplitQueue"'
+            - '            } ],'
+            - '            "Retry" : ['
+            - '              {'
+            - '                "ErrorEquals": [ "States.Timeout" ],'
+            - '                "MaxAttempts": 0'
+            - '              },'
+            - '              {'
+            - '                "ErrorEquals": [ "States.ALL" ],'
+            - '                "MaxAttempts": 1'
+            - '              }'
+            - '            ]'
+            - '        },'
+            - '        "CleanupChoice" : {'
+            - '            "Type" : "Choice", '
+            - '            "Choices" : [ '
+            - '                { "Variable": "$.messageCount", "NumericGreaterThan":
+              0, "Next": "datasetCleanup" }'
+            - '                          ],'
+            - '            "Default" : "endSplitQueue"'
+            - '        },'
+            - '        "datasetCleanup" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - datasetCleanup
+                      - Arn
+                  - '",'
+            - '            "Next" : "CleanupChoice",'
+            - '            "Catch": [ {'
+            - '               "ErrorEquals": ["States.ALL"],'
+            - '               "Next": "endSplitQueue"'
+            - '            } ],'
+            - '            "Retry" : ['
+            - '              {'
+            - '                "ErrorEquals": [ "States.Timeout" ],'
+            - '                "MaxAttempts": 0'
+            - '              },'
+            - '              {'
+            - '                "ErrorEquals": [ "States.ALL" ],'
+            - '                "MaxAttempts": 1'
+            - '              }'
+            - '            ]'
+            - '        },'
+            - '        "endSplitQueue" : {'
+            - '            "Type" : "Task", '
+            - Fn::Join:
+                - ''
+                - - '            "Resource" : "'
+                  - Fn::GetAtt:
+                      - endSplitQueue
+                      - Arn
+                  - '",'
+            - '            "End" : true,'
+            - '            "Retry" : ['
+            - '              {'
+            - '                "ErrorEquals": [ "States.Timeout" ],'
+            - '                "MaxAttempts": 0'
+            - '              },'
+            - '              {'
+            - '                "ErrorEquals": [ "States.ALL" ],'
+            - '                "MaxAttempts": 10'
+            - '              }'
+            - '            ]'
+            - '        }'
+            - '    }'
+            - '}'
+      RoleArn:
+        Fn::GetAtt:
+          - StateSplitQueueRole
+          - Arn
+  LambdaRunSplitQueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: StartExecutionStateSplitQueue
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaStartSplitQueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: UpdateDataTableCapacity
+        - Ref: ConsumeSplitQueue
+        - Ref: ReadDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaEndSplitQueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: UpdateDataTableCapacity
+        - Ref: ConsumeSplitQueue
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaStepSplitQueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ConsumeSplitQueue
+        - Ref: ReadUploaded
+        - Ref: ReadDatasets
+        - Ref: WriteDatasets
+        - Ref: PublishSplitQueueTopic
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaDatasetCleanupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteDatasets
+        - Ref: ReadDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  scheduleSplitQueueRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Join:
+          - ''
+          - - scheduleSplitQueueRule
+            - '-'
+            - Ref: AWS::StackName
+      Description: scheduleSplitQueue triggering event
+      ScheduleExpression: rate(8 hours)
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - runSplitQueue
+              - Arn
+          Id: runSplitQueue
+          Input: '{ "time": "scheduled" }'
+  LambdaRunSplitQueueInvokeScheduleSplitQueuePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - runSplitQueue
+          - Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:events:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - rule/scheduleSplitQueueRule
+            - '-'
+            - Ref: AWS::StackName
+    Metadata:
+      Comment: Scheduler for the runner to split files
+  UploadsChangesTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: PushBucketNotificationPolicy
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBucketToPushNotificationEffect
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: sns:Publish
+            Resource: '*'
+            Condition:
+              StringEquals:
+                AWS:SourceAccount:
+                  Ref: AWS::AccountId
+              ArnLike:
+                AWS:SourceArn:
+                  Fn::Join:
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - Ref: AWS::StackName
+                      - -gator
+      Topics:
+        - Ref: UploadsChangesTopic
+  ConfChangesTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: PushBucketNotificationPolicy
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBucketToPushNotificationEffect
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: sns:Publish
+            Resource: '*'
+            Condition:
+              StringEquals:
+                AWS:SourceAccount:
+                  Ref: AWS::AccountId
+              ArnLike:
+                AWS:SourceArn:
+                  Fn::Join:
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - Ref: AWS::StackName
+                      - -gator
+      Topics:
+        - Ref: ConfChangesTopic
+  SplitQueueTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: LambdaNotificationPolicy
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLambdaToPushNotificationEffectStepSplitQueue
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: sns:Publish
+            Resource: '*'
+            Condition:
+              StringEquals:
+                AWS:SourceAccount:
+                  Ref: AWS::AccountId
+              ArnLike:
+                AWS:SourceArn:
+                  Fn::GetAtt:
+                    - stepSplitQueue
+                    - Arn
+      Topics:
+        - Ref: SplitQueueTopic
+  UploadsChangesTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Uploaded files changes
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+              - splitFiles
+              - Arn
+          Protocol: lambda
+  dataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Join:
+          - ''
+          - - Ref: AWS::StackName
+            - -gator
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 2
+            Status: Enabled
+            Prefix: sessions/
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+            Topic:
+              Ref: UploadsChangesTopic
+          - Event: s3:ObjectRemoved:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+            Topic:
+              Ref: UploadsChangesTopic
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: conf
+            Topic:
+              Ref: ConfChangesTopic
+          - Event: s3:ObjectRemoved:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: conf
+            Topic:
+              Ref: ConfChangesTopic
+    DependsOn:
+      - UploadsChangesTopicPolicy
+      - ConfChangesTopicPolicy
+  SplitFilesUploadChangesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - splitFiles
+          - Arn
+      Principal: sns.amazonaws.com
+      SourceArn:
+        Ref: UploadsChangesTopic
+    DependsOn: splitFiles
+  LambdaReadAllDataRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+  GatordataLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: GatordataLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaSplitFilesRole
+        - Ref: LambdaReadAllDataRole
+        - Ref: LambdaRunSplitQueueRole
+        - Ref: LambdaStartSplitQueueRole
+        - Ref: LambdaStepSplitQueueRole
+        - Ref: LambdaEndSplitQueueRole
+        - Ref: LambdaDatasetCleanupRole
+    DependsOn:
+      - LambdaSplitFilesRole
+      - LambdaReadAllDataRole
+      - LambdaRunSplitQueueRole
+  ReadUploaded:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Read data uploaded to gator
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/uploads/*
+  WriteDatasets:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Write split json files
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/data/latest/*
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator
+            Condition:
+              StringLike:
+                s3:prefix:
+                  - data/latest/*
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:GetItem
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:dynamodb:'
+                  - Ref: AWS::Region
+                  - ':'
+                  - Ref: AWS::AccountId
+                  - :table/
+                  - Ref: data
+  ReadDatasets:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Read datasets
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/data/latest/*
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:Scan
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:dynamodb:'
+                  - Ref: AWS::Region
+                  - ':'
+                  - Ref: AWS::AccountId
+                  - :table/
+                  - Ref: data
+  ConsumeSplitQueue:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: ConsumeSplitQueue
+      PolicyDocument:
+        Id: ConsumeSplitQueue
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ConsumeSplitQueueSQS
+            Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:GetQueueUrl
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource:
+              Fn::GetAtt:
+                - SplitQueue
+                - Arn
+    DependsOn: SplitQueue
+  WriteSplitQueue:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: WriteSplitQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteSplitQueue
+            Effect: Allow
+            Action: sqs:SendMessage
+            Resource:
+              Fn::GetAtt:
+                - SplitQueue
+                - Arn
+  PublishSplitQueueTopic:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: PublishSplitQueueTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - sns:Publish
+            Effect: Allow
+            Resource:
+              - Ref: SplitQueueTopic
+  StartExecutionStateSplitQueue:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: StartExecutionStateSplitQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+              - states:ListExecutions
+            Resource:
+              - Ref: StateSplitQueue
+  UpdateDataTableCapacity:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Update capacity for writing to data table
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:UpdateTable
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:dynamodb:'
+                  - Ref: AWS::Region
+                  - ':'
+                  - Ref: AWS::AccountId
+                  - :table/
+                  - Ref: data
+  grants:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - grants
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: valid_to
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: valid_to
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: '1'
+        WriteCapacityUnits: '1'
+  AuthLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AuthLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaExchangetokenRole
+        - Ref: LambdaDatahandlerRole
+        - Ref: LambdaLoginhandlerRole
+        - Ref: LambdaRdatasethandlerRole
+    DependsOn:
+      - LambdaExchangetokenRole
+      - LambdaLoginhandlerRole
+      - LambdaDatahandlerRole
+      - LambdaRdatasethandlerRole
+  LambdaExchangetokenRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadGrants
+        - Ref: WriteSession
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaDatahandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadGrants
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaLoginhandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns: []
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaRdatasethandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadGrants
+        - Ref: ReadDatasets
+        - Ref: ReadSession
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  exchangetoken:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.exchangetoken = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: exchangetoken
+      Handler: index.exchangetoken
+      Environment:
+        Variables:
+          AUTH0_DOMAIN:
+            Ref: AUTH0DOMAIN
+          ENABLE_LOGIN_GOOGLE_ACCOUNTS:
+            Ref: ENABLELOGINGOOGLEACCOUNTS
+          AUTH0_API_IDENTIFIER:
+            Ref: AUTH0APIIDENTIFIER
+      Role:
+        Fn::GetAtt:
+          - LambdaExchangetokenRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 20
+    DependsOn: LambdaExchangetokenRole
+  datahandler:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.datahandler = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: datahandler
+      Handler: index.datahandler
+      Environment:
+        Variables:
+          AUTH0_DOMAIN:
+            Ref: AUTH0DOMAIN
+          ENABLE_LOGIN_GOOGLE_ACCOUNTS:
+            Ref: ENABLELOGINGOOGLEACCOUNTS
+          AUTH0_API_IDENTIFIER:
+            Ref: AUTH0APIIDENTIFIER
+      Role:
+        Fn::GetAtt:
+          - LambdaDatahandlerRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 10
+    DependsOn: LambdaDatahandlerRole
+  loginhandler:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.loginhandler = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: loginhandler
+      Handler: index.loginhandler
+      Environment:
+        Variables:
+          AUTH0_DOMAIN:
+            Ref: AUTH0DOMAIN
+          ENABLE_LOGIN_GOOGLE_ACCOUNTS:
+            Ref: ENABLELOGINGOOGLEACCOUNTS
+          AUTH0_API_IDENTIFIER:
+            Ref: AUTH0APIIDENTIFIER
+      Role:
+        Fn::GetAtt:
+          - LambdaLoginhandlerRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 10
+    DependsOn: LambdaLoginhandlerRole
+  rdatasethandler:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.rdatasethandler = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: rdatasethandler
+      Handler: index.rdatasethandler
+      Environment:
+        Variables:
+          AUTH0_DOMAIN:
+            Ref: AUTH0DOMAIN
+          ENABLE_LOGIN_GOOGLE_ACCOUNTS:
+            Ref: ENABLELOGINGOOGLEACCOUNTS
+          AUTH0_API_IDENTIFIER:
+            Ref: AUTH0APIIDENTIFIER
+      Role:
+        Fn::GetAtt:
+          - LambdaRdatasethandlerRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 10
+    DependsOn: LambdaRdatasethandlerRole
+  ReadGrants:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: ReadGrants
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadGrants
+            Effect: Allow
+            Action:
+              - dynamodb:Scan
+              - dynamodb:BatchGetItem
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:dynamodb:'
+                  - Ref: AWS::Region
+                  - ':'
+                  - Ref: AWS::AccountId
+                  - :table/
+                  - Ref: grants
+    DependsOn: grants
+  WriteSession:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: WriteSession
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteSession
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/sessions/*
+  ReadSession:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: WriteSession
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteSession
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/sessions/*
+  WriteGrants:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: WriteGrants
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteGrants
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:Scan
+              - dynamodb:BatchWriteItem
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:dynamodb:'
+                  - Ref: AWS::Region
+                  - ':'
+                  - Ref: AWS::AccountId
+                  - :table/
+                  - Ref: grants
+    DependsOn: grants
+  serialiseDataset:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.serialiseDataset = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: serialiseDataset
+      Handler: index.serialiseDataset
+      Role:
+        Fn::GetAtt:
+          - LambdaSerialiseDatasetRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 1024
+      Timeout: 300
+  signRdataUrl:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - '''use strict'';'
+              - const AWS = require('aws-sdk');
+              - exports.signRdataUrl = function(event, context) {
+              - '    let s3Params = {'
+              - '        Bucket: process.env.BUCKET,'
+              - '        Key: ''rdata/''+event.path.split(''/'').reverse().shift(),'
+              - '        Expires: 10000'
+              - '    };'
+              - '    let s3 = new AWS.S3();'
+              - '    let response = {'
+              - '        statusCode: 302,'
+              - '        headers: {'
+              - '            ''Location'' : '''''
+              - '        },'
+              - '        body: '''''
+              - '    };'
+              - '    s3.getSignedUrl(''getObject'', s3Params, function(err, url){'
+              - '        response.body = url;'
+              - '        response.headers.Location = url;'
+              - '        context.done(err,response);'
+              - '    });'
+              - '};'
+      Description: signRdataUrl
+      Handler: index.signRdataUrl
+      Environment:
+        Variables:
+          BUCKET:
+            Fn::Join:
+              - ''
+              - - Ref: AWS::StackName
+                - -gator
+      Role:
+        Fn::GetAtt:
+          - LambdaReadRDatasetsRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 300
+  serialiseDatasetBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        EnvironmentVariables:
+          - Name: BUILD_BUCKET
+            Value:
+              Fn::Join:
+                - ''
+                - - Ref: AWS::StackName
+                  - -gator
+          - Name: BUILD_TABLE
+            Value:
+              Ref: data
+          - Name: BUILD_KEY
+            Value: ''
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: docker.io/hirenj/rdataset-builder
+        Type: LINUX_CONTAINER
+      Name:
+        Fn::Join:
+          - ''
+          - - Ref: AWS::StackName
+            - -SerialiseDatasetBuild
+      ServiceRole:
+        Ref: LambdaBuildSerialiseDatasetRole
+      Source:
+        Location: https://github.com/hirenj/lambda-rdatasets.git
+        Type: GITHUB
+  LambdaSerialiseDatasetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteRDatasets
+        - Ref: ReadUploaded
+        - Ref: WriteDatasets
+        - Ref: RunSerialiseDatasetBuild
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaReadRDatasetsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadRDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  LambdaBuildSerialiseDatasetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteRDatasets
+        - Ref: ReadUploaded
+        - Ref: WriteDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+  WriteRDatasets:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Write R datasets
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/rdata/*
+  ReadRDatasets:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Read R datasets
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: AWS::StackName
+                    - -gator/rdata/*
+  RunSerialiseDatasetBuild:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Allow function to trigger builds
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - codebuild:StartBuild
+            Resource:
+              - Fn::GetAtt:
+                  - serialiseDatasetBuildProject
+                  - Arn
+  serialiseDatasetLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: serialiseDatasetLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaSerialiseDatasetRole
+        - Ref: LambdaBuildSerialiseDatasetRole
+  readUserConf:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.readUserConf = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: readUserConf
+      Handler: index.readUserConf
+      Role:
+        Fn::GetAtt:
+          - LambdaReadUserConfRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 300
+  LambdaReadUserConfRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: WriteGrants
+        - Ref: ReadValidGroups
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  ReadValidGroups:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: ReadValidGroups
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadValidGroupObjects
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: AWS::StackName
+                    - -gator
+                    - /conf/groups/*
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: AWS::StackName
+                    - -gator
+                    - /conf/grants/*
+          - Sid: ListValidGroupObjects
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:aws:s3:'
+                    - ':'
+                    - ':'
+                    - Ref: AWS::StackName
+                    - -gator
+            Condition:
+              ForAnyValue:StringEquals:
+                s3:prefix:
+                  - conf/groups
+                  - conf/grants
+  ConfChangesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - readUserConf
+          - Arn
+      Principal: sns.amazonaws.com
+      SourceArn:
+        Ref: ConfChangesTopic
+  readUserConfLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: readUserConfLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaReadUserConfRole
+  updateMetadata:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile:
+          Fn::Join:
+            - ''
+            - - exports.updateMetadata = function(event, context) {
+              - '  context.succeed(''OK'');'
+              - '};'
+      Description: updateMetadata
+      Handler: index.updateMetadata
+      Environment:
+        Variables: {}
+      Role:
+        Fn::GetAtt:
+          - LambdaUpdateMetadataRole
+          - Arn
+      Runtime: nodejs8.10
+      MemorySize: 512
+      Timeout: 60
+    DependsOn: LambdaUpdateMetadataRole
+  LambdaUpdateMetadataRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadDatasets
+        - Ref: WriteDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+  UpdateMetadataLogWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: UpdateMetadataLogWriterPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - Ref: LambdaUpdateMetadataRole
+  dataApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: GatorData REST api
+      Name:
+        Fn::Join:
+          - ''
+          - - 'GatorData REST api '
+            - Ref: AWS::StackName
+      BinaryMediaTypes:
+        - application~1octet-stream
+  authLoginhandler:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:apigateway:'
+            - Ref: AWS::Region
+            - :lambda:path/2015-03-31/functions/
+            - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: loginhandler
+            - /invocations
+      Type: TOKEN
+      IdentityValidationExpression: Bearer [^\.]+\.[^\.]+\.[^\.]+
+      IdentitySource: method.request.header.Authorization
+      Name: Login_authoriser
+      RestApiId:
+        Ref: dataApi
+  authLoginhandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: loginhandler
+      Principal: apigateway.amazonaws.com
+  authDatahandler:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      AuthorizerResultTtlInSeconds: '0'
+      AuthorizerUri:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:apigateway:'
+            - Ref: AWS::Region
+            - :lambda:path/2015-03-31/functions/
+            - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: datahandler
+            - /invocations
+      Type: TOKEN
+      IdentityValidationExpression: Bearer [^\.]+\.[^\.]+\.[^\.]+
+      IdentitySource: method.request.header.Authorization
+      Name: Data_access_authoriser
+      RestApiId:
+        Ref: dataApi
+  authDatahandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: datahandler
+      Principal: apigateway.amazonaws.com
+  dataApiLogin:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Fn::GetAtt:
+          - dataApi
+          - RootResourceId
+      PathPart: login
+  dataApiLoginGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiLogin
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates: {}
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: exchangetoken
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiLoginGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: exchangetoken
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/login
+  dataApiLoginPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiLogin
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authLoginhandler
+      RequestParameters:
+        method.request.header.Authorization: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: '{ "Authorization" : "$input.params().header.get(''Authorization'')"
+            }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            SelectionPattern: .*Unauthorized.*
+            StatusCode: 401
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: exchangetoken
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+        - StatusCode: 401
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiLoginPOSTPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: exchangetoken
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/POST/login
+  dataApiLoginConfig:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiLogin
+      PathPart: config
+  dataApiLoginConfigGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiLoginConfig
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters: {}
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode" : 200 }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json:
+                Fn::Join:
+                  - ''
+                  - - '{ "API_AUDIENCE" : "'
+                    - Ref: AUTH0APIIDENTIFIER
+                    - '", "AUTH0_DOMAIN" : "'
+                    - Ref: AUTH0DOMAIN
+                    - '"  }'
+            StatusCode: 200
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiDoi:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Fn::GetAtt:
+          - dataApi
+          - RootResourceId
+      PathPart: doi
+  dataApiDoiDoi:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDoi
+      PathPart: '{doi}'
+  dataApiDoiDoiGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDoiDoi
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.path.doi: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Authorization')\"\
+            , \n \"acc\" : \"publications\",\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: "#set($data = $input.path('$.data'))\n#set($wanted\
+                \ = $util.urlDecode($input.params('doi')))\n#set($any = 'false')\n\
+                {\n#foreach($set in $data)\n  \"$set.dataset\" : {\n  \"title\" :\
+                \ \"$set.metadata.title\",\n  \"dois\" : #if($set.dois.values.size()\
+                \ > 0) $set.dois.values #else [] #end\n },\n#end\n  \"specific\" :\
+                \ [\n#foreach($set in $data)\n#if($set.dois.values.size() > 0 && $set.dois.values.contains($wanted)\
+                \ && $any == 'true') ,\"$set.dataset\" #end\n#if($set.dois.values.size()\
+                \ > 0 && $set.dois.values.contains($wanted) && $any == 'false') \"\
+                $set.dataset\" #set($any = 'true') #end\n#end\n  ]\n}"
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiDoiDoiGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/doi/{doi}
+  dataApiMetadata:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Fn::GetAtt:
+          - dataApi
+          - RootResourceId
+      PathPart: metadata
+  dataApiMetadataGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiMetadata
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.header.Authorization: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Authorization')\"\
+            , \n \"acc\" : \"publications\",\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: "#set($data = $input.path('$.data'))\n#set($grants\
+                \ = $util.parseJson($context.authorizer.principalId))\n{\n#foreach($grant\
+                \ in $grants.keySet())\n#if($grant.split('/')[0] == 'data-feature')\n\
+                \  \"$grant.split('/')[1]\" : { \"type\" : \"data-feature\" } #if($data.size()\
+                \ > 0),#end\n#end\n#end\n#foreach($set in $data)\n#set($idx = $velocityCount\
+                \ - 1)\n#set($metapath = \"$.data[$idx].metadata\")\n  \"$set.dataset\"\
+                \ : $input.json(\"$metapath\")\n#if($foreach.hasNext),#end\n#end\n\
+                }"
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiMetadataGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/metadata
+  dataApiMetadataDataset:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiMetadata
+      PathPart: '{dataset}'
+  dataApiMetadataDatasetGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiMetadataDataset
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.path.dataset: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Authorization')\"\
+            , \n \"acc\" : \"metadata\",\n \"dataset\" : \"$input.params('dataset')\"\
+            ,\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.json('$.metadata')
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiMetadataDatasetGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/metadata/*
+  dataApiData:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Fn::GetAtt:
+          - dataApi
+          - RootResourceId
+      PathPart: data
+  dataApiDataLatest:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiData
+      PathPart: latest
+  dataApiDataLatestDataset:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatest
+      PathPart: '{dataset}'
+  dataApiDataLatestDatasetAcc:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatestDataset
+      PathPart: '{acc}'
+  dataApiDataLatestDatasetAccGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestDatasetAcc
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.path.dataset: true
+        method.request.path.acc: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Authorization')\"\
+            , \n \"acc\" : \"$input.params('acc')\",\n \"dataset\" : \"$input.params('dataset')\"\
+            ,\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiDataLatestDatasetAccGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/data/latest/{dataset}/{acc}
+  dataApiDataLatestCombined:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatest
+      PathPart: combined
+  dataApiDataLatestCombinedAcc:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatestCombined
+      PathPart: '{acc}'
+  dataApiDataLatestCombinedAccGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestCombinedAcc
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.path.acc: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Authorization')\"\
+            , \n \"acc\" : \"$input.params('acc')\",\n \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiDataLatestCombinedAccGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/data/latest/combined/{acc}
+  dataApiDataLatestHomology:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatest
+      PathPart: homology
+  dataApiDataLatestHomologyAcc:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatestHomology
+      PathPart: '{acc}'
+  dataApiDataLatestHomologyAccGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestHomologyAcc
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.path.acc: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Authorization')\"\
+            , \n \"homology\" : true, \n \"acc\" : \"$input.params('acc')\",\n \"\
+            grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiDataLatestHomologyAccGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/GET/data/latest/homology/{acc}
+  dataApiDataLatestUniprot:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatest
+      PathPart: uniprot
+  dataApiDataLatestUniprotAcc:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiDataLatestUniprot
+      PathPart: '{acc}'
+  dataApiDataLatestUniprotAccGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestUniprotAcc
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId:
+        Ref: authDatahandler
+      RequestParameters:
+        method.request.path.acc: true
+      Integration:
+        Type: HTTP
+        CacheKeyParameters:
+          - method.request.path.acc
+        IntegrationHttpMethod: GET
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters:
+          integration.request.path.acc: method.request.path.acc
+        RequestTemplates: {}
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: "#set($lines = $input.body.split('\\n'))\n#set($header\
+                \ = $lines.get(0).replaceAll('>[a-zA-Z\\|0-9_]+ ','').replaceAll('\"\
+                ',''))\n#set($empty = $!lines.set(0,''))\n#set($quote = '\"')\n{\"\
+                data\":[$quote#foreach($line in $lines)$line.replace('\n','')#end$quote,\"\
+                $header\"]}"
+            StatusCode: 200
+        Uri: https://www.uniprot.org/uniprot/{acc}.fasta
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiTools:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Fn::GetAtt:
+          - dataApi
+          - RootResourceId
+      PathPart: tools
+  dataApiToolsClustal:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiTools
+      PathPart: clustal
+  dataApiToolsClustalPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiToolsClustal
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters: {}
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: '{"sequences" : "$util.escapeJavaScript($input.body)"}'
+          application/x-www-form-urlencoded: "## convert HTML POST data or HTTP GET\
+            \ query string to JSON\n \n## get the raw post data from the AWS built-in\
+            \ variable and give it a nicer name\n#if ($context.httpMethod == \"POST\"\
+            )\n #set($rawAPIData = $input.path(\"$\"))\n#elseif ($context.httpMethod\
+            \ == \"GET\")\n #set($rawAPIData = $input.params().querystring)\n #set($rawAPIData\
+            \ = $rawAPIData.toString())\n #set($rawAPIDataLength = $rawAPIData.length()\
+            \ - 1)\n #set($rawAPIData = $rawAPIData.substring(1, $rawAPIDataLength))\n\
+            \ #set($rawAPIData = $rawAPIData.replace(\", \", \"&\"))\n#else\n #set($rawAPIData\
+            \ = \"\")\n#end\n \n## first we get the number of \"&\" in the string,\
+            \ this tells us if there is more than one key value pair\n#set($countAmpersands\
+            \ = $rawAPIData.length() - $rawAPIData.replace(\"&\", \"\").length())\n\
+            \ \n## if there are no \"&\" at all then we have only one key value pair.\n\
+            ## we append an ampersand to the string so that we can tokenise it the\
+            \ same way as multiple kv pairs.\n## the \"empty\" kv pair to the right\
+            \ of the ampersand will be ignored anyway.\n#if ($countAmpersands == 0)\n\
+            \ #set($rawPostData = $rawAPIData + \"&\")\n#end\n \n## now we tokenise\
+            \ using the ampersand(s)\n#set($tokenisedAmpersand = $rawAPIData.split(\"\
+            &\"))\n \n## we set up a variable to hold the valid key value pairs\n\
+            #set($tokenisedEquals = [])\n \n## now we set up a loop to find the valid\
+            \ key value pairs, which must contain only one \"=\"\n#foreach( $kvPair\
+            \ in $tokenisedAmpersand )\n #set($countEquals = $kvPair.length() - $kvPair.replace(\"\
+            =\", \"\").length())\n #if ($countEquals == 1)\n  #set($kvTokenised =\
+            \ $kvPair.split(\"=\"))\n  #if ( ( $kvTokenised[0].length() > 0 ) && (\
+            \ $kvTokenised[1].length() > 0 ) )\n   ## we found a valid key value pair.\
+            \ add it to the list.\n   #set($devNull = $tokenisedEquals.add($kvPair))\n\
+            \  #end\n #end\n#end\n \n## next we set up our loop inside the output\
+            \ structure \"{\" and \"}\"\n{\n#foreach( $kvPair in $tokenisedEquals\
+            \ )\n  ## finally we output the JSON for this pair and append a comma\
+            \ if this isn't the last pair\n  #set($kvTokenised = $kvPair.split(\"\
+            =\"))\n \"$util.urlDecode($kvTokenised[0])\" : #if($kvTokenised.size()\
+            \ > 1 && $kvTokenised[1].length() > 0)\"$util.urlDecode($kvTokenised[1])\"\
+            #{else}\"\"#end#if( $foreach.hasNext ),#end\n#end\n}"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: clustal
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiToolsClustalPOSTPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: clustal
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/POST/tools/clustal
+  GatewayResponse404:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+        gatewayresponse.header.Access-Control-Allow-Headers: '''*'''
+      ResponseType: MISSING_AUTHENTICATION_TOKEN
+      RestApiId:
+        Ref: dataApi
+      StatusCode: '404'
+  GatewayResponse401:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+        gatewayresponse.header.Access-Control-Allow-Headers: '''*'''
+      ResponseType: UNAUTHORIZED
+      RestApiId:
+        Ref: dataApi
+      StatusCode: '401'
+  productionDeployment:
+    DependsOn:
+      - dataApiLoginGET
+      - dataApiLoginPOST
+      - dataApiLoginConfigGET
+      - dataApiDoiDoiGET
+      - dataApiMetadataGET
+      - dataApiMetadataDatasetGET
+      - dataApiDataLatestDatasetAccGET
+      - dataApiDataLatestCombinedAccGET
+      - dataApiDataLatestHomologyAccGET
+      - dataApiDataLatestUniprotAccGET
+      - dataApiToolsClustalPOST
+      - dataApiRepositoryTokenTokenSrcContribPackagesGET
+      - dataApiRepositoryTokenTokenSrcContribPackagesGzGET
+      - dataApiRepositoryTokenTokenSrcContribPathGET
+      - dataApiRepositoryTokenTokenSrcContribPathHEAD
+      - dataApiRepositorySrcContribPathPOST
+      - dataApiRepositoryTokenTokenSrcContribPackagesHEAD
+      - dataApiRepositoryTokenTokenSrcContribPackagesGzHEAD
+      - dataApiRepositorySrcContribPACKAGESPOST
+      - dataApiLoginGETOPTIONS
+      - dataApiLoginConfigGETOPTIONS
+      - dataApiDoiDoiGETOPTIONS
+      - dataApiMetadataGETOPTIONS
+      - dataApiMetadataDatasetGETOPTIONS
+      - dataApiDataLatestDatasetAccGETOPTIONS
+      - dataApiDataLatestCombinedAccGETOPTIONS
+      - dataApiDataLatestHomologyAccGETOPTIONS
+      - dataApiDataLatestUniprotAccGETOPTIONS
+      - dataApiToolsClustalPOSTOPTIONS
+      - dataApiRepositoryTokenTokenSrcContribPackagesGETOPTIONS
+      - dataApiRepositoryTokenTokenSrcContribPackagesGzGETOPTIONS
+      - dataApiRepositoryTokenTokenSrcContribPathGETOPTIONS
+      - dataApiRepositorySrcContribPathPOSTOPTIONS
+      - dataApiRepositorySrcContribPACKAGESPOSTOPTIONS
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      Description: Default Deployment
+      StageName: productionDeploymentDummyStage
+  Production:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: api
+      Description: Production Stage
+      RestApiId:
+        Ref: dataApi
+      DeploymentId:
+        Ref: productionDeployment
+      Variables:
+        Stack:
+          Ref: AWS::StackName
+      MethodSettings: []
+  publicWebsiteUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      ApiStages:
+        - ApiId:
+            Ref: dataApi
+          Stage:
+            Ref: Production
+      Description: Public website API usage plan
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
+      UsagePlanName: public_website_usage
+  authRdatasethandler:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:apigateway:'
+            - Ref: AWS::Region
+            - :lambda:path/2015-03-31/functions/
+            - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: rdatasethandler
+            - /invocations
+      Type: TOKEN
+      IdentityValidationExpression: .+
+      IdentitySource: method.request.header.Auth
+      Name: Rdataset_access_authoriser
+      RestApiId:
+        Ref: dataApi
+  authRdatasethandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: rdatasethandler
+      Principal: apigateway.amazonaws.com
+  dataApiRepository:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Fn::GetAtt:
+          - dataApi
+          - RootResourceId
+      PathPart: repository
+  dataApiRepositoryToken:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepository
+      PathPart: token
+  dataApiRepositoryTokenToken:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositoryToken
+      PathPart: '{token}'
+  dataApiRepositoryTokenTokenSrc:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositoryTokenToken
+      PathPart: src
+  dataApiRepositoryTokenTokenSrcContrib:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositoryTokenTokenSrc
+      PathPart: contrib
+  dataApiRepositoryTokenTokenSrcContribPackages:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositoryTokenTokenSrcContrib
+      PathPart: PACKAGES
+  dataApiRepositoryTokenTokenSrcContribPackagesGz:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositoryTokenTokenSrcContrib
+      PathPart: PACKAGES.gz
+  dataApiRepositoryTokenTokenSrcContribPackagesGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPackages
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+      Integration:
+        Type: HTTP
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates: {}
+        RequestParameters:
+          integration.request.header.Accept: '''application/json'''
+          integration.request.header.Auth: method.request.path.token
+          integration.request.path.path: '''PACKAGES'''
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Content-Type: '''text/plain'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - https://
+              - Ref: dataApi
+              - .execute-api.
+              - Ref: AWS::Region
+              - .amazonaws.com/api/repository/src/contrib/{path}
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Content-Type: true
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositoryTokenTokenSrcContribPackagesGzGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPackagesGz
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode" : 403 }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            SelectionPattern: .*
+            StatusCode: 403
+      MethodResponses:
+        - StatusCode: 403
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositoryTokenTokenSrcContribPath:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositoryTokenTokenSrcContrib
+      PathPart: '{path+}'
+  dataApiRepositoryTokenTokenSrcContribPathGET:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPath
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+        method.request.path.path: true
+      Integration:
+        Type: HTTP
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates: {}
+        RequestParameters:
+          integration.request.header.Accept: '''application/octet-stream'''
+          integration.request.header.Auth: method.request.path.token
+          integration.request.path.path: method.request.path.path
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+          - ResponseParameters:
+              method.response.header.Location: integration.response.header.Location
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            SelectionPattern: '302'
+            StatusCode: 302
+        Uri:
+          Fn::Join:
+            - ''
+            - - https://
+              - Ref: dataApi
+              - .execute-api.
+              - Ref: AWS::Region
+              - .amazonaws.com/api/repository/src/contrib/{path}
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+        - StatusCode: 302
+          ResponseParameters:
+            method.response.header.Location: true
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositoryTokenTokenSrcContribPathHEAD:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPath
+      HttpMethod: HEAD
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+        method.request.path.path: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode" : 200 }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositorySrcContribPath:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositorySrcContrib
+      PathPart: '{path+}'
+  dataApiRepositorySrcContribPathPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositorySrcContribPath
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: authRdatasethandler
+      RequestParameters:
+        method.request.path.path: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: '{ "path" : "$input.params().path.get(''path'')" }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: signRdataUrl
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositorySrcContribPathPOSTPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: signRdataUrl
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/POST/repository/src/contrib/*
+  dataApiRepositoryTokenTokenSrcContribPackagesHEAD:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPackages
+      HttpMethod: HEAD
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+        method.request.path.path: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode" : 200 }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            SelectionPattern: .*
+            StatusCode: 200
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositoryTokenTokenSrcContribPackagesGzHEAD:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPackagesGz
+      HttpMethod: HEAD
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+        method.request.path.path: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode" : 403 }'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates: {}
+            SelectionPattern: .*
+            StatusCode: 403
+      MethodResponses:
+        - StatusCode: 403
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositorySrc:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepository
+      PathPart: src
+  dataApiRepositorySrcContrib:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositorySrc
+      PathPart: contrib
+  dataApiRepositorySrcContribPACKAGES:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ParentId:
+        Ref: dataApiRepositorySrcContrib
+      PathPart: PACKAGES
+  dataApiRepositorySrcContribPACKAGESPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositorySrcContribPACKAGES
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: authRdatasethandler
+      RequestParameters:
+        method.request.path.path: true
+        method.request.header.Auth: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: "{ \"Authorization\" : \"$input.params().header.get('Auth')\"\
+            , \n \"acc\" : \"publications\",\n  \"grants\" : \"$util.escapeJavaScript($context.authorizer.principalId)\"\
+            \ }"
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: "#set($data = $input.path('$.data'))\n#set($extension='.RData.tar.gz')\n\
+                #set($packages = [])\n#set($has_rdata = false)\n#set($grants = $util.parseJson($context.authorizer.principalId))\n\
+                #set($grants_full = $grants['data-feature/full_rdata'])\n#set($grants_partial\
+                \ = $grants['data-feature/partial_rdata'])\n#if(\"$grants_partial\"\
+                \ != \"\" || \"$grants_full\" != \"\")\n#set($has_rdata = true)\n\
+                #end\n#if(\"$grants_partial\" != \"\")\n#set($rdata_prefix = 'partial_')\n\
+                #end\n#if(\"$grants_full\" != \"\")\n#set($rdata_prefix = '')\n#end\n\
+                #foreach($set in $data)\n#set($idx = $velocityCount - 1)\n#if($has_rdata\
+                \ == true && \"$data[$idx].metadata.rpackage\" != \"\")\n#set($foo\
+                \ = $packages.add($data[$idx].metadata.rpackage))\nPackage: gator.$data[$idx].metadata.rpackage.split('_')[0]\n\
+                File: $rdata_prefix$data[$idx].metadata.rpackage$extension\nVersion:\
+                \ $data[$idx].metadata.rpackage.split('_')[1]\nNeedsCompilation: no\n\
+                \n#end\n#end\n#set($now = $input.path('$.retrieved'))\n#set($today\
+                \ = $now.split('T')[0])\nPackage: gatordata\nFile: gatordata.tar.gz\n\
+                Version: $today.replace('-','.')\nNeedsCompilation: no\nImports:\n\
+                #foreach($set in $packages)\n#set($idx = $velocityCount - 1)\n   \
+                \ gator.$set.split('_')[0] (>= $set.split('_')[1]) #if($velocityCount\
+                \ < ${packages.size()}),#end\n#end"
+            StatusCode: 200
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - :lambda:path/2015-03-31/functions/
+              - 'arn:aws:lambda:'
+              - Ref: AWS::Region
+              - ':'
+              - Ref: AWS::AccountId
+              - ':function:'
+              - Ref: readAllData
+              - /invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  dataApiRepositorySrcContribPACKAGESPOSTPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:lambda:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':function:'
+            - Ref: readAllData
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: dataApi
+            - /*/POST/repository/src/contrib/PACKAGES
+  ReadRDatasetsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - Ref: ReadRDatasets
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+  codeupdates:
+    Type: AWS::S3::Bucket
+    Properties: {}
+  dnsEntry:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId:
+        Ref: HostedZone
+      RecordSets:
+        - Name:
+            Fn::Join:
+              - .
+              - - Ref: AWS::StackName
+                - Ref: DomainName
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName:
+              Fn::GetAtt:
+                - www
+                - DomainName
+  www:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - Fn::Join:
+              - .
+              - - Ref: AWS::StackName
+                - Ref: DomainName
+        Origins:
+          - Id: api
+            DomainName:
+              Fn::Join:
+                - .
+                - - Ref: dataApi
+                  - execute-api
+                  - Ref: AWS::Region
+                  - amazonaws.com
+            CustomOriginConfig:
+              HTTPPort: '80'
+              HTTPSPort: '443'
+              OriginProtocolPolicy: match-viewer
+          - Id: S3Origin
+            DomainName:
+              Fn::Join:
+                - ''
+                - - Ref: wwwBucket
+                  - .s3-website-
+                  - Ref: AWS::Region
+                  - .amazonaws.com
+            CustomOriginConfig:
+              HTTPPort: '80'
+              HTTPSPort: '443'
+              OriginProtocolPolicy: http-only
+        Enabled: true
+        Comment: API access
+        PriceClass: PriceClass_100
+        CacheBehaviors:
+          - PathPattern: api/*
+            AllowedMethods:
+              - DELETE
+              - GET
+              - HEAD
+              - OPTIONS
+              - PATCH
+              - POST
+              - PUT
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Authorization
+                - Origin
+              Cookies:
+                Forward: none
+            MinTTL: '0'
+            DefaultTTL: '0'
+            MaxTTL: '0'
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          ForwardedValues:
+            QueryString: true
+            Headers:
+              - Authorization
+              - Origin
+            Cookies:
+              Forward: none
+          MinTTL: '0'
+          DefaultTTL: '0'
+          MaxTTL: '0'
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 0
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+  wwwBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      BucketName:
+        Fn::Join:
+          - .
+          - - Ref: AWS::StackName
+            - glycocode
+            - com
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+        RoutingRules:
+          - RedirectRule:
+              ReplaceKeyWith: doi/cleaneddoi
+            RoutingRuleCondition:
+              KeyPrefixEquals: doi/unclean/doi/
+  wwwBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: wwwBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:s3:::'
+                  - Ref: wwwBucket
+                  - /*
+            Principal: '*'
+  dataApiLoginGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiLogin
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiLoginConfigGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiLoginConfig
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters: {}
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiDoiDoiGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDoiDoi
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.doi: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiMetadataGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiMetadata
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters: {}
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiMetadataDatasetGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiMetadataDataset
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.dataset: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiDataLatestDatasetAccGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestDatasetAcc
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.dataset: true
+        method.request.path.acc: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiDataLatestCombinedAccGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestCombinedAcc
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.acc: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiDataLatestHomologyAccGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestHomologyAcc
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.acc: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiDataLatestUniprotAccGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiDataLatestUniprotAcc
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.acc: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiToolsClustalPOSTOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiToolsClustal
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters: {}
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''POST,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiRepositoryTokenTokenSrcContribPackagesGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPackages
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiRepositoryTokenTokenSrcContribPackagesGzGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPackagesGz
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiRepositoryTokenTokenSrcContribPathGETOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositoryTokenTokenSrcContribPath
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.token: true
+        method.request.path.path: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiRepositorySrcContribPathPOSTOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositorySrcContribPath
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.path: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''POST,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+  dataApiRepositorySrcContribPACKAGESPOSTOPTIONS:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: dataApi
+      ResourceId:
+        Ref: dataApiRepositorySrcContribPACKAGES
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.path: true
+        method.request.header.Auth: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
+              method.response.header.Access-Control-Allow-Credentials: '''true'''
+              method.response.header.Access-Control-Allow-Max-Age: '''1800'''
+              method.response.header.Access-Control-Allow-Expose-Headers: ''''''
+              method.response.header.Access-Control-Allow-Methods: '''POST,OPTIONS'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: 200
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Allow-Max-Age: true
+            method.response.header.Access-Control-Allow-Expose-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: 200
+Outputs:
+  WriteGrants:
+    Description: Arn for writing grants policy
+    Value:
+      Ref: WriteGrants
