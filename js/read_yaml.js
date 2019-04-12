@@ -1,5 +1,7 @@
 const CLOUDFORMATION_SCHEMA = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA;
 
+const REF_TYPE = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA.compiledTypeMap.scalar['!Ref'];
+
 const assert = require('assert');
 
 const yaml_include = require('yaml-include');
@@ -91,6 +93,8 @@ const enable_cors = template => {
       return;
     }
     let options_method = JSON.parse(JSON.stringify(resource));
+    options_method.Properties.RestApiId = REF_TYPE.construct(options_method.Properties.RestApiId.data);
+    options_method.Properties.ResourceId = REF_TYPE.construct(options_method.Properties.ResourceId.data);
     options_method.Properties.HttpMethod = 'OPTIONS';
     if (options_method.Properties.RequestParameters) {
       delete options_method.Properties.RequestParameters['method.request.header.Authorization'];
