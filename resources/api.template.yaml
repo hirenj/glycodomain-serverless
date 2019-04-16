@@ -318,6 +318,37 @@ Resources:
       RestApiId: !Ref 'dataApi'
       ParentId: !Ref 'dataApiData'
       PathPart: latest
+  dataApiDataLatestPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref 'dataApi'
+      ResourceId: !Ref 'dataApiDataLatest'
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId: !Ref 'authDatahandler'
+      RequestParameters:
+        method.request.header.Authorization: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters: {}
+        RequestTemplates:
+          application/json: |
+            {
+              "Authorization" : "$input.params().header.get('Authorization')",
+              "acc"     : "$input.params('acc')",
+              "dataset" : "$input.params('dataset')",
+              "grants"  : "$util.escapeJavaScript($context.authorizer.principalId)"
+            }
+        IntegrationResponses:
+          - ResponseParameters: {}
+            ResponseTemplates: {}
+            StatusCode: 200
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${readAllData}/invocations'
+      MethodResponses:
+        - StatusCode: 200
   dataApiDataLatestDataset:
     Type: AWS::ApiGateway::Resource
     Properties:
