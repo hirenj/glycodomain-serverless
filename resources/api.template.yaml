@@ -333,20 +333,18 @@ Resources:
         Type: AWS
         IntegrationHttpMethod: POST
         PassthroughBehavior: WHEN_NO_MATCH
-        RequestParameters: {}
+        RequestParameters:
+          integration.request.header.grants: context.authorizer.principalId
         RequestTemplates:
           application/json: |
-            {
-              "Authorization" : "$input.params().header.get('Authorization')",
-              "acc"     : "$input.params('acc')",
-              "dataset" : "$input.params('dataset')",
-              "grants"  : "$util.escapeJavaScript($context.authorizer.principalId)"
+            { 
+              "query": "{ posts { title } }"
             }
         IntegrationResponses:
           - ResponseParameters: {}
             ResponseTemplates: {}
             StatusCode: 200
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${readAllData}/invocations'
+        Uri: !Ref 'graphqlEndpoint'
       MethodResponses:
         - StatusCode: 200
   dataApiDataLatestDataset:
