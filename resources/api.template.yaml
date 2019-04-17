@@ -325,6 +325,7 @@ Resources:
       ParentId: !Ref 'dataApiDataLatest'
       PathPart: '{dataset}'
   dataApiDataLatestDatasetPOST:
+    DependsOn: GraphQLApi
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref 'dataApi'
@@ -362,7 +363,7 @@ Resources:
           - ResponseParameters: {}
             ResponseTemplates: {}
             StatusCode: 200
-        Uri: !Ref 'graphqlEndpoint'
+        Uri: !GetAtt GraphQLApi.GraphQLUrl
       MethodResponses:
         - StatusCode: 200
   dataApiDataLatestDatasetAcc:
