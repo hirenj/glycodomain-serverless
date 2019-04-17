@@ -324,48 +324,48 @@ Resources:
       RestApiId: !Ref 'dataApi'
       ParentId: !Ref 'dataApiDataLatest'
       PathPart: '{dataset}'
-  dataApiDataLatestDatasetPOST:
-    DependsOn: GraphQLApi
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref 'dataApi'
-      ResourceId: !Ref 'dataApiDataLatestDataset'
-      HttpMethod: POST
-      AuthorizationType: CUSTOM
-      ApiKeyRequired: true
-      AuthorizerId: !Ref 'authDatahandler'
-      RequestParameters:
-        method.request.header.Authorization: true
-        method.request.path.dataset: true
-      Integration:
-        Type: AWS
-        IntegrationHttpMethod: POST
-        PassthroughBehavior: WHEN_NO_MATCH
-        RequestParameters:
-          integration.request.header.grants: context.authorizer.principalId
-        RequestTemplates:
-          application/json: |
-            { 
-              "query": "query getAccs($accs: [String]!, $dataset: String) {
-                getAccs(accs: $accs, dataset: $dataset ) {
-                  items {
-                    data {
-                      ... on Domains {
-                        dom
-                      }
-                    }
-                  }
-                }
-              }",
-              "variables" : 
-            }
-        IntegrationResponses:
-          - ResponseParameters: {}
-            ResponseTemplates: {}
-            StatusCode: 200
-        Uri: !GetAtt GraphQLApi.GraphQLUrl
-      MethodResponses:
-        - StatusCode: 200
+  # dataApiDataLatestDatasetPOST:
+  #   DependsOn: GraphQLApi
+  #   Type: AWS::ApiGateway::Method
+  #   Properties:
+  #     RestApiId: !Ref 'dataApi'
+  #     ResourceId: !Ref 'dataApiDataLatestDataset'
+  #     HttpMethod: POST
+  #     AuthorizationType: CUSTOM
+  #     ApiKeyRequired: true
+  #     AuthorizerId: !Ref 'authDatahandler'
+  #     RequestParameters:
+  #       method.request.header.Authorization: true
+  #       method.request.path.dataset: true
+  #     Integration:
+  #       Type: AWS
+  #       IntegrationHttpMethod: POST
+  #       PassthroughBehavior: WHEN_NO_MATCH
+  #       RequestParameters:
+  #         integration.request.header.grants: context.authorizer.principalId
+  #       RequestTemplates:
+  #         application/json: |
+  #           { 
+  #             "query": "query getAccs($accs: [String]!, $dataset: String) {
+  #               getAccs(accs: $accs, dataset: $dataset ) {
+  #                 items {
+  #                   data {
+  #                     ... on Domains {
+  #                       dom
+  #                     }
+  #                   }
+  #                 }
+  #               }
+  #             }",
+  #             "variables" : 
+  #           }
+  #       IntegrationResponses:
+  #         - ResponseParameters: {}
+  #           ResponseTemplates: {}
+  #           StatusCode: 200
+  #       Uri: !GetAtt GraphQLApi.GraphQLUrl
+  #     MethodResponses:
+  #       - StatusCode: 200
   dataApiDataLatestDatasetAcc:
     Type: AWS::ApiGateway::Resource
     Properties:
