@@ -370,6 +370,8 @@ Resources:
 
             const variables = event.variables || {};
 
+            const grants = JSON.stringify(event.grants || []);
+
             const post_body = {
               query,
               variables
@@ -380,6 +382,7 @@ Resources:
             const httpRequest = new AWS.HttpRequest(uri.href, env.AWS_REGION);
             httpRequest.headers.host = uri.host;
             httpRequest.headers['Content-Type'] = 'application/json';
+            httpRequest.headers['grants'] = grants;
             httpRequest.method = 'POST';
             httpRequest.body = JSON.stringify(post_body);
 
@@ -467,7 +470,8 @@ Resources:
               "variables" : {
                 "accs" : ["q14112","q14118"],
                 "dataset" : "$input.params('dataset')"
-              }
+              },
+              "grants" : "$util.escapeJavaScript($context.authorizer.principalId)"
             }
         IntegrationResponses:
           - ResponseParameters: {}
