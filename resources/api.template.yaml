@@ -471,7 +471,7 @@ Resources:
                 "accs" : ["q14112","q14118"],
                 "dataset" : "$input.params('dataset')"
               },
-              "grants" : "$util.escapeJavaScript($context.authorizer.principalId)"
+              "grants" : $context.authorizer.principalId
             }
         IntegrationResponses:
           - ResponseParameters: {}
