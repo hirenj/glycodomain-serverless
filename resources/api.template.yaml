@@ -465,9 +465,13 @@ Resources:
         RequestTemplates:
           application/json: |
             #set ( $d = "$")
+            #set($hasFilter = $input.path('$.filter') != "")
             {
-              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { acc data { ... on Domains { dom start end } ... on SlimExpression { tissue location value } } } unprocessed } }",
+              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String, ${d}filter: DataFilter) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { acc data(filter: ${d}filter) { ... on Domains { dom start end } ... on SlimExpression { tissue location value } } } unprocessed } }",
               "variables" : {
+                #if ( $hasFilter )
+                "filter" : $input.json('$.filter'),
+                #end
                 "accs" : $input.json('$.accs'),
                 "dataset" : "$input.params('dataset')"
               },
