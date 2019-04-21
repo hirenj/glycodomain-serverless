@@ -466,7 +466,7 @@ Resources:
           application/json: |
             #set ( $d = "$")
             {
-              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { data { ... on Domains { dom start end } ... on SlimExpression { tissue location value } } } unprocessed } }",
+              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { acc data { ... on Domains { dom start end } ... on SlimExpression { tissue location value } } } unprocessed } }",
               "variables" : {
                 "accs" : $input.json('$.accs'),
                 "dataset" : "$input.params('dataset')"
