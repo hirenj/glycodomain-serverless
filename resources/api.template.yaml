@@ -466,9 +466,9 @@ Resources:
           application/json: |
             #set ( $d = "$")
             {
-              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { data { ... on Domains { dom start end } } } } }",
+              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { data { ... on Domains { dom start end } } } unprocessed } }",
               "variables" : {
-                "accs" : ["q14112","q14118"],
+                "accs" : $input.json('$.accs'),
                 "dataset" : "$input.params('dataset')"
               },
               "grants" : $context.authorizer.principalId
