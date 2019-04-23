@@ -209,8 +209,4 @@ let generated_yaml_string = yaml.safeDump(stack, {schema: CLOUDFORMATION_SCHEMA 
 
 let generated_yaml = yaml.safeLoad(generated_yaml_string,{schema: CLOUDFORMATION_SCHEMA });
 
-let correct_yaml = yaml.safeLoad(fs.readFileSync('target_template_short.yaml'), {schema: CLOUDFORMATION_SCHEMA });
-
-assert.deepEqual(generated_yaml, correct_yaml);
-
 fs.writeFileSync('glycodomain.template',generated_yaml_string);
