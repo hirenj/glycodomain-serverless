@@ -89,7 +89,7 @@ const enable_cors = template => {
       return;
     }
     let method_base = method.replace(/POST/,'').replace(/GET/,'');
-    if (template.Resources[method_base+'POSTOPTIONS'] || template.Resources[method_base+'GETOPTIONS']) {
+    if (template.Resources[method_base+'OPTIONS']) {
       return;
     }
     let options_method = JSON.parse(JSON.stringify(resource));
@@ -129,7 +129,7 @@ const enable_cors = template => {
     }];
     options_method.Properties.AuthorizationType = "NONE";
     delete options_method.Properties.AuthorizerId;
-    template.Resources[method+'OPTIONS'] = options_method;
+    template.Resources[method_base+'OPTIONS'] = options_method;
   });
 };
 
@@ -202,7 +202,25 @@ for (let template of sub_templates) {
 }
 
 enable_cors(stack);
+let options_stack = yaml.safeLoad(fs.readFileSync('stack_definition.yaml'));
+
+for (let key of Object.keys(stack.Resources)) {
+  if (stack.Resources[key].Type === 'AWS::ApiGateway::Method' && stack.Resources[key].Properties.HttpMethod == 'OPTIONS') {
+    options_stack.Resources[key] = stack.Resources[key];
+    delete options_stack.Resources[key].DependsOn;
+    delete stack.Resources[key];
+  }
+}
+
+fill_parameters(options_stack);
+if (stack.Resources['optionsStack']) {
+  for (let key of Object.keys(options_stack.Parameters)) {
+    stack.Resources['optionsStack'].Properties.Parameters[key] = REF_TYPE.construct(key);
+  }
+}
+
 fill_parameters(stack);
+
 fix_deployment_dependency(stack);
 
 let generated_yaml_string = yaml.safeDump(stack, {schema: CLOUDFORMATION_SCHEMA });
@@ -210,3 +228,6 @@ let generated_yaml_string = yaml.safeDump(stack, {schema: CLOUDFORMATION_SCHEMA 
 let generated_yaml = yaml.safeLoad(generated_yaml_string,{schema: CLOUDFORMATION_SCHEMA });
 
 fs.writeFileSync('glycodomain.template',generated_yaml_string);
+
+fs.writeFileSync('glycodomain_options.template', yaml.safeDump(options_stack, {schema: CLOUDFORMATION_SCHEMA }));
+

@@ -1,6 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters: {}
 Resources:
+  optionsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${codeupdates}/templates/glycodomain_options.template'
+      Parameters: {}
   dataApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
