@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "relink": "for mod in `npm ls 2>&1 | grep missing | sed -e 's/@.*//' -e 's/.* //'`; do npm link $mod; done"
+    "relink": "for mod in `npm ls 2>&1 | grep missing | sed -e 's/@.*//' -e 's/.* //'`; do npm link $mod; done",
+    "syncbranch": "./scripts/sync_branch"
   },
   "dependencies": {
     "auth0": "^2.7.0",
