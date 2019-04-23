@@ -12,10 +12,10 @@ for module in $(python scripts/list_submodules.py); do
 		git diff --quiet || ( echo "$module has modified files" && exit 1 )
 		git fetch
 		current_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
-		echo "$current_branch $wanted_branch"
 		if [[ "$current_branch" != "$wanted_branch" ]]; then
 			exists=$(git show-ref refs/heads/$wanted_branch)
-			if [ -n "$exists" ]; then
+			exists_remote=$(git show-ref git show-branch remotes/origin/$wanted_branch)
+			if [[ -n "$exists" || -n "$exists_remote" ]]; then
 			    echo "Branch $wanted_branch already exists"
 			else
 			    echo "Creating branch $wanted_branch"
