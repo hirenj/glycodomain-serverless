@@ -253,12 +253,12 @@ Resources:
             ResponseTemplates:
               application/json: |-
                 $input.path('$.body.data.protectedFile.url')
-            StatusCode: 302
+            StatusCode: 200
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}/invocations'
       MethodResponses:
         - ResponseParameters:
             method.response.header.Location: true
-          StatusCode: 302
+          StatusCode: 200
   dataApiFilesGETPermission:
     Type: AWS::Lambda::Permission
     Properties:
