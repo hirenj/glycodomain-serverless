@@ -582,7 +582,7 @@ Resources:
           - ResponseParameters: {}
             ResponseTemplates:
               application/json: |-
-                $input.path('$.body.data.getAccs')
+                $input.json('$.body.data.getAccs')
             StatusCode: 200
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}/invocations'
       MethodResponses:
