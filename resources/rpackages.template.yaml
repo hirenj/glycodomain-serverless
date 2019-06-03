@@ -337,15 +337,3 @@ Resources:
       FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${readAllData}'
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dataApi}/*/POST/repository/src/contrib/PACKAGES'
-  ReadRDatasetsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      ManagedPolicyArns:
-        - !Ref 'ReadRDatasets'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole

@@ -1,11 +1,13 @@
 {
   "name": "glycodomain-serverless",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AWS / Lambda backed implementation of Glycodomain data API",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "relink": "for mod in `npm ls 2>&1 | grep missing | sed -e 's/@.*//' -e 's/.* //'`; do npm link $mod; done"
+    "relink": "for mod in `npm ls 2>&1 | grep missing | sed -e 's/@.*//' -e 's/.* //'`; do npm link $mod; done",
+    "smerge": "for sub in `python scripts/list_submodules.py`; do (smerge -b -n $sub; sleep 0.1;); done",
+    "syncbranch": "./scripts/sync_branch"
   },
   "dependencies": {
     "auth0": "^2.7.0",
@@ -17,7 +19,8 @@
     "lambda-grantauths": "hirenj/lambda-grantauths",
     "lambda-rdatasets": "hirenj/lambda-rdatasets",
     "lambda-readuserconf": "hirenj/lambda-readuserconf",
-    "lambda-update_metadata": "hirenj/lambda-update_metadata"
+    "lambda-update_metadata": "hirenj/lambda-update_metadata",
+    "lambda-gatorgraphql": "hirenj/lambda-gatorgraphql"
   },
   "repository": {
     "type": "git",

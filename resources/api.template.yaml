@@ -1,6 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters: {}
 Resources:
+  optionsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${codeupdates}/templates/glycodomain_options.template'
+      Parameters: {}
   dataApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -207,6 +212,60 @@ Resources:
       FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${readAllData}'
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dataApi}/*/GET/doi/{doi}'
+  dataApiFiles:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref 'dataApi'
+      ParentId: !GetAtt 'dataApi.RootResourceId'
+      PathPart: files
+  dataApiFilesGET:
+    DependsOn: GraphQLApi
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref 'dataApi'
+      ResourceId: !Ref 'dataApiFiles'
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId: !Ref 'authDatahandler'
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.querystring.path: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters:
+          integration.request.header.grants: context.authorizer.principalId
+        RequestTemplates:
+          application/json: |
+            #set ( $d = "$")
+            {
+              "query": "query getFile(${d}path: String) { protectedFile(path: ${d}path) { url } }",
+              "variables" : {
+                "path" : "$input.params('path')"
+              },
+              "grants" : $context.authorizer.principalId
+            }
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Location: integration.response.body.body.data.protectedFile.url
+            ResponseTemplates:
+              application/json: |-
+                $input.path('$.body.data.protectedFile.url')
+            StatusCode: 200
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}/invocations'
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Location: true
+          StatusCode: 200
+  dataApiFilesGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dataApi}/*/GET/files'
   dataApiMetadata:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -263,6 +322,48 @@ Resources:
       FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${readAllData}'
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dataApi}/*/GET/metadata'
+  dataApiMetadataSources:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref 'dataApi'
+      ParentId: !Ref 'dataApiMetadata'
+      PathPart: 'sources'
+  dataApiMetadataSourcesGET:
+    DependsOn: GraphQLApi
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref 'dataApi'
+      ResourceId: !Ref 'dataApiMetadataSources'
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId: !Ref 'authDatahandler'
+      RequestParameters:
+        method.request.header.Authorization: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters:
+          integration.request.header.grants: context.authorizer.principalId
+        RequestTemplates:
+          application/json: |
+            #set ( $d = "$")
+            #set($hasFilter = $input.path('$.filter') != "")
+            {
+              "query": "query { getTissuesCellMetadata { tissue location datasets } }",
+              "variables" : { },
+              "grants" : $context.authorizer.principalId
+            }
+        IntegrationResponses:
+          - ResponseParameters: {}
+            ResponseTemplates:
+              application/json: |-
+                $input.path('$.body.data.getTissuesCellMetadata')
+            StatusCode: 200
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}/invocations'
+      MethodResponses:
+        - StatusCode: 200
   dataApiMetadataDataset:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -324,6 +425,182 @@ Resources:
       RestApiId: !Ref 'dataApi'
       ParentId: !Ref 'dataApiDataLatest'
       PathPart: '{dataset}'
+  appSyncProxy:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: >
+          const env = require('process').env;
+          const URL = require('url');
+          const AWS = require('aws-sdk');
+          const https = require('https');
+
+          AWS.config.update({
+            region: env.AWS_REGION
+          });
+
+          const do_request = async options => {
+            return new Promise( (resolve,reject) => {
+              let data = '';
+              let req = https.request(options, res => {
+                res.setEncoding('utf8');
+                res.on('data', chunk => {
+                  data = data + chunk;
+                });
+                res.on('end', () => { 
+                  let message = { statusCode: res.statusCode, body: data, headers: { 'Content-Type':'application/json' } };
+                  if (message.statusCode !== 200) {
+                    reject(message);
+                  } else {
+                    resolve(message);
+                  }
+                });
+              });
+
+              req.on('error', reject);
+              req.write(options.body);
+              req.end();
+            });
+          };
+
+
+          exports.handler = async (event, context) => {
+            console.log(`Event = ${JSON.stringify(event, null, 2)}`);
+
+            const query = event.query;
+
+            const variables = event.variables || {};
+
+            const grants = JSON.stringify(event.grants || []);
+
+            const post_body = {
+              query,
+              variables
+            };
+
+            // POST the GraphQL mutation to AWS AppSync using a signed connection
+            const uri = URL.parse(env.GRAPHQL_API);
+            const httpRequest = new AWS.HttpRequest(uri.href, env.AWS_REGION);
+            httpRequest.headers.host = uri.host;
+            httpRequest.headers['Content-Type'] = 'application/json';
+            httpRequest.headers['grants'] = grants;
+            httpRequest.method = 'POST';
+            httpRequest.body = JSON.stringify(post_body);
+
+            return new Promise((resolve,reject) => {
+              AWS.config.credentials.get(err => {
+                if (err) {
+                  reject(err);
+                }
+                    
+                const signer = new AWS.Signers.V4(httpRequest, "appsync", true);
+                signer.addAuthorization(AWS.config.credentials, AWS.util.date.getDate());
+
+                const options = {
+                  hostname: uri.host,
+                  path: uri.pathname,
+                  method: httpRequest.method,
+                  body: httpRequest.body,
+                  headers: httpRequest.headers
+                };
+
+                let request = do_request(options).then( message => {
+                  message.body = JSON.parse(message.body);
+                  return message;
+                });
+
+                resolve(request);
+
+              });
+            });
+          };
+      Description: AppSyncProxy
+      Environment:
+        Variables:
+          GRAPHQL_API: !GetAtt GraphQLApi.GraphQLUrl
+      Handler: index.handler
+      Role: !GetAtt 'LambdaAppSyncProxyRole.Arn'
+      Runtime: nodejs8.10
+      MemorySize: 128
+      Timeout: 10
+  LambdaAppSyncProxyRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ExecuteAppSync
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - appsync:GraphQL
+                Resource: !Sub ${GraphQLApi.Arn}/*
+  dataApiDataLatestDatasetPOST:
+    DependsOn: GraphQLApi
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref 'dataApi'
+      ResourceId: !Ref 'dataApiDataLatestDataset'
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      ApiKeyRequired: true
+      AuthorizerId: !Ref 'authDatahandler'
+      RequestParameters:
+        method.request.header.Authorization: true
+        method.request.path.dataset: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters:
+          integration.request.header.grants: context.authorizer.principalId
+        RequestTemplates:
+          application/json: |
+            #set ( $d = "$")
+            #set($hasFilter = $input.path('$.filter') != "")
+            {
+              "query": "query getAccs(${d}accs: [String]!, ${d}dataset: String, ${d}filter: DataFilter) { getAccs(accs: ${d}accs, dataset: ${d}dataset ) { items { acc data(filter: ${d}filter) { ... on Domains { dom start end } ... on SlimExpression { tissue location value } } } unprocessed } }",
+              "variables" : {
+                #if ( $hasFilter )
+                "filter" : $input.json('$.filter'),
+                #end
+                "accs" : $input.json('$.accs'),
+                "dataset" : "$input.params('dataset')"
+              },
+              "grants" : $context.authorizer.principalId
+            }
+        IntegrationResponses:
+          - ResponseParameters: {}
+            ResponseTemplates:
+              application/json: |-
+                $input.json('$.body.data.getAccs')
+            StatusCode: 200
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}/invocations'
+      MethodResponses:
+        - StatusCode: 200
+  dataApiDataLatestDatasetPOSTPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dataApi}/*/POST/data/latest/{dataset}'
+  dataApiMetadataSourcesGETPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${appSyncProxy}'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dataApi}/*/GET/metadata/sources'
   dataApiDataLatestDatasetAcc:
     Type: AWS::ApiGateway::Resource
     Properties:

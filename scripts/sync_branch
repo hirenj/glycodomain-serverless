@@ -1,0 +1,33 @@
+#!/bin/bash
+
+wanted_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+
+for module in $(python scripts/list_submodules.py); do
+	( 	echo "Setting up branch for $module";
+		if [[ ! -d "$module" ]]; then
+			echo "Module $module does not exist"
+			exit 1
+		fi
+		cd $module
+		git diff --quiet || ( echo "$module has modified files" && exit 1 )
+		git fetch
+		current_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+		if [[ "$current_branch" != "$wanted_branch" ]]; then
+			exists=$(git show-ref refs/heads/$wanted_branch)
+			exists_remote=$(git show-ref git show-branch remotes/origin/$wanted_branch)
+			if [[ -n "$exists" || -n "$exists_remote" ]]; then
+			    echo "Branch $wanted_branch already exists"
+			else
+			    echo "Creating branch $wanted_branch"
+				git branch "$wanted_branch"
+			fi
+			echo "Using Branch '$wanted_branch' for $module"
+			git checkout "$wanted_branch"
+		else
+			echo "Using Branch '$wanted_branch' for $module"
+		fi
+	)
+	if [[ $? -gt 0 ]]; then
+		exit 1
+	fi
+done

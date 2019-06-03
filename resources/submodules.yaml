@@ -8,3 +8,4 @@ modules:
   rdatasets: !!inc/file 'node_modules/lambda-rdatasets/resources/rdatasets.yaml'
   readuserconf: !!inc/file 'node_modules/lambda-readuserconf/resources/readuserconf.yaml'
   updatemetadata: !!inc/file 'node_modules/lambda-update_metadata/resources/update_metadata.yaml'
+  graphql: !!inc/file 'node_modules/lambda-gatorgraphql/resources/graphql.yaml'

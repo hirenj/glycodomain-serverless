@@ -13,3 +13,15 @@ We will now have the existing stack definition in the short format.
 Apply the CloudFormation updates using the `target_template.yaml` and then `target_template_short.yaml`
 
 
+## Policies to inline
+```
+ReadConfig
+StartExecutionStatePostProcess
+WriteSplitQueue
+PublishSplitQueueTopic
+StartExecutionStateSplitQueue
+WriteSession
+ReadSession
+ReadRDatasets
+RunSerialiseDatasetBuild
+```

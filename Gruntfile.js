@@ -144,14 +144,19 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('releaseLambda', function () {
-		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
+			return dep.indexOf('lambda') >= 0;
+		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
 			grunt.task.run('taglambda:'+module);
 		});
 	});
 	grunt.registerTask('taglambda', function (dir) {
 		var version = grunt.file.readJSON('package.json').version;
-		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
+			return dep.indexOf('lambda') >= 0;
+		}).map( dep => `node_modules/${dep}`);
+
 		var done = this.async();
 
 		grunt.log.writeln('tagging ' + dir);
@@ -179,14 +184,18 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('pushLambdas', function () {
-		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
+			return dep.indexOf('lambda') >= 0;
+		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
 			grunt.task.run('pushLambda:'+module);
 		});
 	});
 	grunt.registerTask('pushLambda', function (dir) {
 		var version = grunt.file.readJSON('package.json').version;
-		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
+			return dep.indexOf('lambda') >= 0;
+		}).map( dep => `node_modules/${dep}`);
 		var done = this.async();
 
 		grunt.log.writeln('pushing ' + dir);
@@ -256,7 +265,9 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('copy_configs', 'Copy master lambda conf to target lambdas', function(stack) {
-		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
+			return dep.indexOf('lambda') >= 0;
+		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
 			grunt.file.copy(stack+'-resources.conf.json',module+'/resources.conf.json');
 		});
@@ -266,7 +277,9 @@ module.exports = function(grunt) {
 		if (grunt.option('generate-changeset')) {
 			return;
 		}
-		var lambda_modules = grunt.file.expand('node_modules/lambda-*/');
+		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
+			return dep.indexOf('lambda') >= 0;
+		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
 			grunt.task.run('uploadlambda:'+module);
 		});
