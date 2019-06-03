@@ -10,6 +10,8 @@ const YAML_INCLUDE_SCHEMA = yaml_include.YAML_INCLUDE_SCHEMA;
 
 const yaml = require('js-yaml');
 
+const exec = require('child_process').exec;
+
 const CFN_SCHEMA = new yaml.Schema({
   include: [ CLOUDFORMATION_SCHEMA, YAML_INCLUDE_SCHEMA ]
 });
@@ -223,11 +225,38 @@ fill_parameters(stack);
 
 fix_deployment_dependency(stack);
 
-let generated_yaml_string = yaml.safeDump(stack, {schema: CLOUDFORMATION_SCHEMA });
+let git_command = 'git describe --long --tags HEAD';
 
-let generated_yaml = yaml.safeLoad(generated_yaml_string,{schema: CLOUDFORMATION_SCHEMA });
+console.log('Getting git status');
 
-fs.writeFileSync('glycodomain.template',generated_yaml_string);
+let get_git_status = () => {
+  return new Promise( (resolve,reject) => {
+    console.log(git_command);
+    exec(git_command,(err,stdout) => {
+      if (err) {
+        reject(err);
+      }
+      resolve(String(stdout).trim());
+    });
+  });
+};
 
-fs.writeFileSync('glycodomain_options.template', yaml.safeDump(options_stack, {schema: CLOUDFORMATION_SCHEMA }));
 
+get_git_status().then( git_status => {
+
+  let status = git_status.replace(/-0-[^-]+$/,'');
+
+  stack.Description = `Glycodomain ${status}`;
+  options_stack.Description = `Glycodomain API options ${status}`;
+
+
+  let generated_yaml_string = yaml.safeDump(stack, {schema: CLOUDFORMATION_SCHEMA });
+
+  let generated_yaml = yaml.safeLoad(generated_yaml_string,{schema: CLOUDFORMATION_SCHEMA });
+
+  fs.writeFileSync('glycodomain.template',generated_yaml_string);
+
+  fs.writeFileSync('glycodomain_options.template', yaml.safeDump(options_stack, {schema: CLOUDFORMATION_SCHEMA }));
+
+
+});
