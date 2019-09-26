@@ -16,7 +16,7 @@ Resources:
   authLoginhandler:
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerResultTtlInSeconds: 300
       AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${loginhandler}/invocations'
       Type: TOKEN
       IdentityValidationExpression: Bearer [^\.]+\.[^\.]+\.[^\.]+
@@ -32,7 +32,7 @@ Resources:
   authDatahandler:
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      AuthorizerResultTtlInSeconds: '0'
+      AuthorizerResultTtlInSeconds: 1800
       AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${datahandler}/invocations'
       Type: TOKEN
       IdentityValidationExpression: Bearer [^\.]+\.[^\.]+\.[^\.]+
