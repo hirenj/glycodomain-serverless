@@ -770,6 +770,7 @@ Resources:
         PassthroughBehavior: WHEN_NO_MATCH
         RequestParameters:
           integration.request.path.acc: method.request.path.acc
+          integration.request.header.Accept: "'text/x-fasta'"
         RequestTemplates: {}
         IntegrationResponses:
           - ResponseParameters: {}
@@ -781,10 +782,10 @@ Resources:
                 #set($quote = '"')
                 {"data":[$quote#foreach($line in $lines)$line.replace('
                 ','')#end$quote,"$header"]}
-            StatusCode: 200
-        Uri: https://www.uniprot.org/uniprot/{acc}.fasta
+            StatusCode: '200'
+        Uri: https://www.ebi.ac.uk/proteins/api/proteins/{acc}
       MethodResponses:
-        - StatusCode: 200
+        - StatusCode: '200'
   dataApiTools:
     Type: AWS::ApiGateway::Resource
     Properties:
