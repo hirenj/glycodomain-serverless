@@ -1,12 +1,12 @@
 {
   "name": "glycodomain-serverless",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "AWS / Lambda backed implementation of Glycodomain data API",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "relink": "for mod in `npm ls 2>&1 | grep missing | sed -e 's/@.*//' -e 's/.* //'`; do npm link $mod; done",
-    "smerge": "for sub in `python scripts/list_submodules.py`; do (smerge -b -n $sub; sleep 0.1;); done",
+    "smerge": "smerge -b -n .; for sub in `python scripts/list_submodules.py`; do (smerge -b -n $sub; sleep 0.1;); done",
     "syncbranch": "./scripts/sync_branch"
   },
   "dependencies": {
