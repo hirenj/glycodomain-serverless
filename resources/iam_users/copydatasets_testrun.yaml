@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters: {}
+Resources:
+  CopyDatasetsTestRunReadOnlyPermissions:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: 'Permissions to run test runs for copying datasets to deploy'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CopyDatasetsReadOnly
+            Effect: Deny
+            Action:
+              - 's3:PutObject'
+              - 's3:DeleteObject'
+            Resource:
+              - !<!Sub> 'arn:aws:s3:::${AWS::StackName}-gator/uploads/*'
+Outputs: {}

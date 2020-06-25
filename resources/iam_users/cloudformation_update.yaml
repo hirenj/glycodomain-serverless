@@ -11,7 +11,6 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       Description: 'Permissions to create changesets for infra updates'
-      ManagedPolicyName: GlycoDomainCreateChangeSet
       PolicyDocument:
         Version: '2012-10-17'
         Statement:

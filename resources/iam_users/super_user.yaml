@@ -3,6 +3,9 @@ Parameters:
   codeupdates:
     Type: String
     Description: 'Code updates S3 bucket'
+  ReadConfig:
+    Type: String
+    Description: 'Parameter ReadConfig'
 Resources:
   SuperUser:
     Type: AWS::IAM::User
@@ -36,4 +39,8 @@ Resources:
                   ArnEquals: 
                     iam:PolicyARN:
                       - !<!Ref> CreateChangeSetPermissions
+                      - !<!Ref> CopyDatasetsTestRunReadOnlyPermissions
+                      - !<!Sub> '${ReadConfig}'
+                      - !<!Sub> 'arn:aws:iam::${AWS::AccountId}:policy/ReadOnlyDataBuilds'
+                      - !<!Sub> 'arn:aws:iam::${AWS::AccountId}:policy/CCGReadOnlyDatasets'
 Outputs: {}
