@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  codeupdates:
+    Type: String
+    Description: 'Code updates S3 bucket'
+Resources:
+  SuperUser:
+    Type: AWS::IAM::User
+    Properties: 
+      Policies:
+        - PolicyName: CreateIAMUser
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'iam:CreateAccessKey'
+                  - 'iam:CreateUser'
+                  - 'iam:DeleteAccessKey'
+                  - 'iam:DeleteUser'
+                  - 'iam:DeleteUserPolicy'
+                  - 'iam:DetachUserPolicy'
+                  - 'iam:ListAccessKeys'
+                  - 'iam:ListAttachedUserPolicies'
+                  - 'iam:ListGroupsForUser'
+                  - 'iam:ListUserPolicies'
+                  - 'iam:RemoveUserFromGroup'
+                Resource:
+                  - !<!Sub> 'arn:aws:iam::${AWS::AccountId}:user/vault-*'
+              - Effect: Allow
+                Action:
+                  - 'iam:AttachUserPolicy'
+                Resource:
+                  - !<!Sub> 'arn:aws:iam::${AWS::AccountId}:user/vault-*'
+                Condition:
+                  ArnEquals: 
+                    iam:PolicyARN:
+                      - !<!Ref> CreateChangeSetPermissions
+Outputs: {}
