@@ -6,6 +6,12 @@ Resources:
     Properties:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${codeupdates}/templates/glycodomain_options.template'
       Parameters: {}
+  usersStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${codeupdates}/templates/glycodomain_users.template'
+      Parameters:
+        parentstack: !<!Ref> AWS::StackId
   dataApi:
     Type: AWS::ApiGateway::RestApi
     Properties:

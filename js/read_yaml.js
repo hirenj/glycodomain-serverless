@@ -215,9 +215,35 @@ for (let key of Object.keys(stack.Resources)) {
 }
 
 fill_parameters(options_stack);
+
 if (stack.Resources['optionsStack']) {
   for (let key of Object.keys(options_stack.Parameters)) {
     stack.Resources['optionsStack'].Properties.Parameters[key] = REF_TYPE.construct(key);
+  }
+}
+
+
+let users_stack = yaml.safeLoad(fs.readFileSync('stack_definition.yaml'));
+
+for (let template of glob.sync('resources/iam_users/*.yaml')) {
+  let template_string = fs.readFileSync(template);
+  let sub_template = yaml.safeLoad(template_string, { schema: CFN_SCHEMA });
+  if (sub_template.AWSTemplateFormatVersion === '2010-09-09') {
+    combine_stacks(users_stack,sub_template);
+  } else if (sub_template.modules) {
+    for (let mod in sub_template.modules) {
+      combine_stacks(users_stack,sub_template.modules[mod]);
+    }
+  }
+}
+
+fill_parameters(users_stack);
+
+if (stack.Resources['usersStack']) {
+  for (let key of Object.keys(users_stack.Parameters)) {
+    if ( ! stack.Resources['usersStack'].Properties.Parameters[key] ) {
+      stack.Resources['usersStack'].Properties.Parameters[key] = REF_TYPE.construct(key);
+    }
   }
 }
 
@@ -258,5 +284,6 @@ get_git_status().then( git_status => {
 
   fs.writeFileSync('glycodomain_options.template', yaml.safeDump(options_stack, {schema: CLOUDFORMATION_SCHEMA }));
 
+  fs.writeFileSync('glycodomain_users.template', yaml.safeDump(users_stack, {schema: CLOUDFORMATION_SCHEMA }));
 
 });

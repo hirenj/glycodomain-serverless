@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  codeupdates:
+    Type: String
+    Description: 'Code updates S3 bucket'
+  parentstack:
+    Type: String
+    Description: 'Parent stack'
+Resources:
+  CreateChangeSetPermissions:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: 'Permissions to create changesets for infra updates'
+      ManagedPolicyName: GlycoDomainCreateChangeSet
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: UploadTemplate
+            Effect: Allow
+            Action:
+              - 's3:PutObject'
+            Resource:
+              - !<!Sub> 'arn:aws:s3:::${codeupdates}/templates/*'
+          - Sid: CloudFormation
+            Effect: Allow
+            Action:
+              - 'cloudformation:CreateChangeSet'
+              - 'cloudformation:GetTemplate'
+              - 'cloudformation:ListStackResources'
+            Resource:
+              - !<!Sub> '${parentstack}'
+          - Sid: ListStacks
+            Effect: Allow
+            Action:
+              - 'cloudformation:DescribeStacks'
+            Resource: '*'
+
+Outputs: {}
