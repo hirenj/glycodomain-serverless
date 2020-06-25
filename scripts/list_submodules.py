@@ -29,4 +29,4 @@ settings_file = open('resources/submodules.yaml', 'r')
 
 settings = yaml.safe_load(settings_file)
 for key,path in settings['modules'].items():
-    print os.path.join(*os.path.split(os.path.dirname(path.path))[:-1])
+    print(os.path.join(*os.path.split(os.path.dirname(path.path))[:-1]))
