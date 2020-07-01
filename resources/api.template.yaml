@@ -12,6 +12,7 @@ Resources:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${codeupdates}/templates/glycodomain_users.template'
       Parameters:
         parentstack: !<!Ref> AWS::StackId
+        parentstackName: !<!Ref> AWS::StackName
   dataApi:
     Type: AWS::ApiGateway::RestApi
     Properties:

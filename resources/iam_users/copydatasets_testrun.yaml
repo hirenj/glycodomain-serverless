@@ -1,5 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Parameters: {}
+Parameters:
+    parentstackName:
+      Type: String
+      Description: 'Parent stack name'
 Resources:
   CopyDatasetsTestRunReadOnlyPermissions:
     Type: AWS::IAM::ManagedPolicy
@@ -8,11 +11,27 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
+          - Sid: CopyDatasetsRead
+            Effect: Allow
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - !<!Sub> 'arn:aws:s3:::${parentstackName}-gator/uploads/*'
           - Sid: CopyDatasetsReadOnly
             Effect: Deny
             Action:
               - 's3:PutObject'
               - 's3:DeleteObject'
             Resource:
-              - !<!Sub> 'arn:aws:s3:::${AWS::StackName}-gator/uploads/*'
+              - !<!Sub> 'arn:aws:s3:::${parentstackName}-gator/uploads/*'
+          - Sid: ListDatasets
+            Effect: Allow
+            Action:
+              - 's3:ListBucket'
+            Resource:
+              - !<!Sub> 'arn:aws:s3:::${parentstackName}-gator'
+            Condition:
+              StringEquals:
+                's3:prefix': uploads/
+
 Outputs: {}
