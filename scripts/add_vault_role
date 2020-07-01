@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import csv
 import sys
 import os.path
@@ -9,16 +10,15 @@ import subprocess
 
 all_roles = {}
 
-stack = sys.argv[1]
-wanted_role = sys.argv[2]
+parser = argparse.ArgumentParser(description='Add Gator roles into a vault instance')
 
-resources_file = f"{stack}-resources.conf.json"
+parser.add_argument('stack',metavar='stack', help='Stack/stage to add roles for')
+parser.add_argument('role',metavar='role', nargs='?',help='Desired role')
 
-if os.path.isfile(resources_file):
-  with open(resources_file) as f:
-    all_resource_data = json.load(f)
-    resource_data = all_resource_data['policies']
-    region = all_resource_data['region']
+args = parser.parse_args()
+
+stack = args.stack
+wanted_role = args.role
 
 def convert_policy(policy,policyarns):
   if policy in policyarns:
@@ -26,15 +26,36 @@ def convert_policy(policy,policyarns):
 
   return(re.sub(r'policy/.*', policy, next(iter(policyarns.values())) ))
 
-with open("vault_roles.tsv") as tsvfile:
-  tsvreader = csv.reader(tsvfile, delimiter="\t")
-  for line in tsvreader:
-    all_roles[line[0]] = [ convert_policy(policy,resource_data) for policy in line[1].split(',')]
+def main():
 
-policy_string = ','.join(all_roles[wanted_role])
-print(policy_string, region,wanted_role)
-add_role = subprocess.run(["./scripts/setup_vault", "-r", region, f'gator-{stack}', wanted_role, policy_string ])
-if add_role.returncode == 0:
-  print(f"Successfully created role {wanted_role} in {stack}")
-else:
-  print("The exit code was: %d" % add_role.returncode)
+  resources_file = f"{stack}-resources.conf.json"
+
+  resource_data = {}
+  if os.path.isfile(resources_file):
+    with open(resources_file) as f:
+      all_resource_data = json.load(f)
+      resource_data = all_resource_data['policies']
+      region = all_resource_data['region']
+  else:
+    print(f'Resources file does not exist for stack {stack} ({stack}-resources.conf.json)')
+    sys.exit(1)
+
+  with open("vault_roles.tsv") as tsvfile:
+    tsvreader = csv.reader(tsvfile, delimiter="\t")
+    for line in tsvreader:
+      all_roles[line[0]] = [ convert_policy(policy,resource_data) for policy in line[1].split(',')]
+
+  if wanted_role is not None:
+    sys.exit(1)
+    policy_string = ','.join(all_roles[wanted_role])
+    add_role = subprocess.run(["./scripts/setup_vault", "-r", region, f'gator-{stack}', wanted_role, policy_string ])
+    if add_role.returncode == 0:
+      print(f"Successfully created role {wanted_role} in {stack}")
+    else:
+      print("The exit code was: %d" % add_role.returncode)
+  else:
+    print('No role given, available roles:')
+    print('\n'.join(all_roles.keys()))
+
+
+main()
