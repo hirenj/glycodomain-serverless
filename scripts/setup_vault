@@ -1,7 +1,7 @@
 #!/bin/bash
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
-while getopts ":hcr" opt; do
+while getopts "hcr:" opt; do
   case ${opt} in
 	h )
 		echo "Usage:"
