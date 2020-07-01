@@ -6,6 +6,9 @@ Parameters:
   parentstack:
     Type: String
     Description: 'Parent stack'
+  optionsStack:
+    Type: String
+    Description: 'Options stack'
 Resources:
   CreateChangeSetPermissions:
     Type: AWS::IAM::ManagedPolicy
@@ -28,6 +31,8 @@ Resources:
               - 'cloudformation:ListStackResources'
             Resource:
               - !<!Sub> '${parentstack}'
+              - !<!Sub> '${AWS::StackId}'
+              - !<!Sub> '${optionsStack}'
           - Sid: ListStacks
             Effect: Allow
             Action:

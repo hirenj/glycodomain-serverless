@@ -85,13 +85,21 @@ var summarise_resources = function(stack,resources) {
 	var stepfunctions = resources.filter(function(resource) {
 		return resource.ResourceType == 'AWS::StepFunctions::StateMachine';
 	});
+	var policies = resources.filter(function(resource) {
+		return resource.ResourceType == 'AWS::IAM::ManagedPolicy';
+	});
+	var substacks = resources.filter(function(resource) {
+		return resource.ResourceType == 'AWS::CloudFormation::Stack';
+	});
 	var stack_conf = { 	'stack' : stack,
+						'substacks' : make_lookup(substacks),
 						'functions' : make_lookup(lambdas),
 						'keys' : make_lookup(key),
 						'tables' : make_lookup(dynamodbs),
 						'buckets' : make_lookup(buckets),
 						'queue' : make_lookup(queue),
 						'stepfunctions' : make_lookup(stepfunctions),
+						'policies' : make_lookup(policies),
 						'rule'  : make_lookup(rule) };
 	return stack_conf;
 };
@@ -258,8 +266,22 @@ module.exports = function(grunt) {
 			return read_stack_region(stack).then(function(region) {
 				var summary = summarise_resources(stack,resources);
 				summary.region = region;
-				grunt.file.write(stack+'-resources.conf.json',JSON.stringify(summary,null,'  '));
-				done();
+				let done_substacks = Promise.resolve();
+				if (summary.substacks) {
+					done_substacks = Promise.all(Object.values(summary.substacks).map( arn => { console.log('Retrieving substack',arn.split('/').slice(-2)[0]); return read_stack_resources(arn.split('/').slice(-2)[0]);})).then( substacks => {
+						let summarised_substacks = substacks.map( resources => summarise_resources('substack',resources) );
+						for (let substack of summarised_substacks) {
+							delete substack.stack;
+							for (let key of Object.keys(substack)) {
+								summary[key] = {...summary[key],...substack[key]};
+							}
+						}
+					});
+				}
+				done_substacks.then( () => {
+					grunt.file.write(stack+'-resources.conf.json',JSON.stringify(summary,null,'  '));
+					done();
+				});
 			});
 		});
 	});
