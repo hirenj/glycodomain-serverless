@@ -268,22 +268,34 @@ let get_git_status = () => {
 };
 
 
-get_git_status().then( git_status => {
+module.exports = get_git_status().then( git_status => {
 
   let status = git_status.replace(/-0-[^-]+$/,'');
 
   stack.Description = `Glycodomain ${status}`;
   options_stack.Description = `Glycodomain API options ${status}`;
 
+  let clean_filename = stack.Description.replace(/[^A-Za-z0-9_\-]/g,'_');
+
+  let users_filename = `${clean_filename.replace('Glycodomain','Glycodomain_users')}.template`;
+  let options_filename = `${clean_filename.replace('Glycodomain','Glycodomain_options')}.template`;
+  for (let [entry, substack] of Object.entries(stack.Resources).filter( ([entry,res]) => { return ['optionsStack','usersStack'].indexOf(entry) >= 0 } ) ) {
+    switch (entry) {
+      case "optionsStack":
+        substack.Properties.TemplateURL.data = substack.Properties.TemplateURL.data.replace(/glycodomain_options.template/, options_filename );
+        break;
+      case "usersStack":
+        substack.Properties.TemplateURL.data = substack.Properties.TemplateURL.data.replace(/glycodomain_users.template/, users_filename );
+        break;
+    }
+  }
 
   let generated_yaml_string = yaml.safeDump(stack, {schema: CLOUDFORMATION_SCHEMA });
 
-  let generated_yaml = yaml.safeLoad(generated_yaml_string,{schema: CLOUDFORMATION_SCHEMA });
-
   fs.writeFileSync('glycodomain.template',generated_yaml_string);
 
-  fs.writeFileSync('glycodomain_options.template', yaml.safeDump(options_stack, {schema: CLOUDFORMATION_SCHEMA }));
+  fs.writeFileSync(options_filename, yaml.safeDump(options_stack, {schema: CLOUDFORMATION_SCHEMA }));
 
-  fs.writeFileSync('glycodomain_users.template', yaml.safeDump(users_stack, {schema: CLOUDFORMATION_SCHEMA }));
+  fs.writeFileSync(users_filename, yaml.safeDump(users_stack, {schema: CLOUDFORMATION_SCHEMA }));
 
 });

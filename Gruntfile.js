@@ -5,6 +5,11 @@
 var AWS = require('aws-sdk');
 var is_new_template = false;
 
+const yaml = require('js-yaml');
+const CLOUDFORMATION_SCHEMA = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA;
+
+
+
 AWS.Request.prototype.promise = function() {
 	return new Promise(function(accept, reject) {
 	this.on('complete', function(response) {
@@ -118,6 +123,24 @@ module.exports = function(grunt) {
 	grunt.loadNpmTasks('grunt-bumpup');
 
 	require('./tasks/auth0init')(grunt);
+
+	function put_templates(bucket, templates) {
+
+		return Promise.all(templates.map( template => {
+			let body,key;
+			if (template.body) {
+				body = template.body;
+				key = template.key;
+			}
+			if (template.path) {
+				body = grunt.file.read(template.path);
+				key = template.path;
+			}
+			console.log('Uploading',key);
+			return s3.putObject({ Bucket: bucket, Key: 'templates/'+key, Body: body }).promise();
+		}));
+	}
+
 
 
 	cloudformation = new AWS.CloudFormation();
@@ -337,14 +360,16 @@ module.exports = function(grunt) {
 		var done = this.async();
 		var stackconfig = require('./'+stack+'-resources.conf.json');
 		if (grunt.option('generate-changeset')) {
-			var key = (new Date()).getTime()+'glycodomain.template';
 			var template_body = grunt.file.read('glycodomain.template');
-			s3.putObject({ Bucket: stackconfig.buckets.codeupdates, Key: 'templates/'+key, Body: template_body }).promise().then(() => {
+			var template_obj = yaml.safeLoad(template_body,{schema: CLOUDFORMATION_SCHEMA });
+			var key = template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'_')+'.template';
+			var sub_templates = Object.entries(template_obj.Resources).filter( ([key,res]) => { return res.Type == 'AWS::CloudFormation::Stack' } ).map( ([_,substack]) => { return { path: substack.Properties.TemplateURL.data.replace(/.*\//,'') } } );
+			put_templates( stackconfig.buckets.codeupdates, [{ body: template_body, key }].concat(sub_templates) ).then(() => {
 				console.log("Created template on S3, initiating changeset");
-				var params_options = Object.keys(JSON.parse(template_body).Parameters).
+				var params_options = Object.keys(template_obj.Parameters).
 					filter( param_name => (grunt.option('new-parameters') || []).indexOf(param_name) < 0 ).
 					map( param_name => { return { ParameterKey: param_name, UsePreviousValue: true }; });
-				return cloudformation.createChangeSet({ChangeSetName: stack+'-patch', Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+stackconfig.buckets.codeupdates+'/templates/'+key }).promise().then((response) => {
+				return cloudformation.createChangeSet({ChangeSetName: stack+'-'+template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'-'), Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+stackconfig.buckets.codeupdates+'/templates/'+key }).promise().then((response) => {
 					console.log(response.data);
 				});
 			}).catch((err) => {
@@ -371,8 +396,6 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('diff_template','Diff two CloudFormation templates',function(stack) {
-		const CLOUDFORMATION_SCHEMA = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA;
-		const yaml = require('js-yaml');
 		let last_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read(stack+'_last.template'),{schema: CLOUDFORMATION_SCHEMA })));
 		let current_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read('glycodomain.template'),{schema: CLOUDFORMATION_SCHEMA })));
 		let diff = require('rus-diff').rusDiff(last_data,current_data);
@@ -384,6 +407,10 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('build_cloudformation', 'Build cloudformation template',function() {
+		var done = this.async();
+		require('./js/read_yaml').then( () => {
+			done();
+		});
 	});
 
 	grunt.registerTask('deploy','Deploy software to AWS',function(stack) {
