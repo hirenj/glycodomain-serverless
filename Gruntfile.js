@@ -119,7 +119,6 @@ module.exports = function(grunt) {
 
 	require('load-grunt-tasks')(grunt);
 
-	grunt.loadNpmTasks('grunt-confirm');
 	grunt.loadNpmTasks('grunt-bumpup');
 
 	require('./tasks/auth0init')(grunt);
@@ -148,14 +147,6 @@ module.exports = function(grunt) {
 
 	var path = require('path');
 	grunt.initConfig({
-		confirm: {
-			update_cloudformation: {
-				options: {
-					question: 'Do you want to deploy the template? :',
-					input: '_key:y' // Continue the flow if `Y` key is pressed.
-				}
-			}
-		},
 		bumpup: { options : { updateProps: { pkg: 'package.json' }}, file: 'package.json' },
 		tagrelease: {
 			version: '<%= pkg.version %>',
@@ -170,19 +161,19 @@ module.exports = function(grunt) {
 		type = type ? type : 'patch';     // Default release type
 		grunt.task.run('bumpup:' + type); // Bump up the version
 		grunt.task.run('tagrelease');     // Commit & tag the release
-		grunt.task.run('releaseLambda');
-		grunt.task.run('pushLambdas');
+		grunt.task.run('_releaseLambda');
+		grunt.task.run('_pushLambdas');
 	});
 
-	grunt.registerTask('releaseLambda', function () {
+	grunt.registerTask('_releaseLambda', function () {
 		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
 			return dep.indexOf('lambda') >= 0;
 		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
-			grunt.task.run('taglambda:'+module);
+			grunt.task.run('_taglambda:'+module);
 		});
 	});
-	grunt.registerTask('taglambda', function (dir) {
+	grunt.registerTask('_taglambda', function (dir) {
 		var version = grunt.file.readJSON('package.json').version;
 		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
 			return dep.indexOf('lambda') >= 0;
@@ -214,15 +205,15 @@ module.exports = function(grunt) {
 		});
 	});
 
-	grunt.registerTask('pushLambdas', function () {
+	grunt.registerTask('_pushLambdas', function () {
 		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
 			return dep.indexOf('lambda') >= 0;
 		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
-			grunt.task.run('pushLambda:'+module);
+			grunt.task.run('_pushLambda:'+module);
 		});
 	});
-	grunt.registerTask('pushLambda', function (dir) {
+	grunt.registerTask('_pushLambda', function (dir) {
 		var version = grunt.file.readJSON('package.json').version;
 		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
 			return dep.indexOf('lambda') >= 0;
@@ -254,7 +245,7 @@ module.exports = function(grunt) {
 	});
 
 
-	grunt.registerTask('uploadlambda', function(dir) {
+	grunt.registerTask('_uploadlambda', function(dir) {
 		var done = this.async();
 
 		grunt.log.writeln('processing ' + dir);
@@ -318,7 +309,7 @@ module.exports = function(grunt) {
 		});
 	});
 
-	grunt.registerTask('upload_lambdas', 'Upload lambdas only', function(stack) {
+	grunt.registerTask('_upload_lambdas', 'Upload lambdas only', function(stack) {
 		if (grunt.option('generate-changeset')) {
 			return;
 		}
@@ -326,21 +317,21 @@ module.exports = function(grunt) {
 			return dep.indexOf('lambda') >= 0;
 		}).map( dep => `node_modules/${dep}`);
 		lambda_modules.forEach(function(module) {
-			grunt.task.run('uploadlambda:'+module);
+			grunt.task.run('_uploadlambda:'+module);
 		});
 	});
 
-	grunt.registerTask('update_configs','Retrieve resources and set config files in place', function(stack) {
+	grunt.registerTask('update_configs','Retrieve resources and set config files in place in the lambdas', function(stack) {
 		grunt.task.run('get_resources:'+stack);
 		grunt.task.run('copy_configs:'+stack);
 	});
 
 	grunt.registerTask('deploy_lambdas', 'Retrieve resources, copy configs and deploy to AWS', function(stack) {
 		grunt.task.run('update_configs:'+stack);
-		grunt.task.run('upload_lambdas:'+stack);
+		grunt.task.run('_upload_lambdas:'+stack);
 	});
 
-	grunt.registerTask('get_current_template','Get cloudformation template',function(stack) {
+	grunt.registerTask('_get_current_template','Get cloudformation template',function(stack) {
 		var done = this.async();
 		cloudformation.getTemplate({'StackName' : stack}).promise().then((response) => {
 			grunt.file.write(stack+'_last.template',response.data.TemplateBody,null,'  ');
@@ -351,11 +342,11 @@ module.exports = function(grunt) {
 	});
 
 	grunt.registerTask('compare_templates','Compare two CloudFormation templates',function(stack) {
-		grunt.task.run('get_current_template:'+stack);
-		grunt.task.run('diff_template:'+stack);
+		grunt.task.run('_get_current_template:'+stack);
+		grunt.task.run('_diff_template:'+stack);
 	});
 
-	grunt.registerTask('update_cloudformation','',function() {
+	grunt.registerTask('_update_cloudformation','',function() {
 		var stack = grunt.option('stack');
 		var done = this.async();
 		var stackconfig = require('./'+stack+'-resources.conf.json');
@@ -392,10 +383,10 @@ module.exports = function(grunt) {
 		grunt.option('stack',stack);
 		grunt.task.run('build_cloudformation');
 		grunt.task.run('compare_templates:'+stack);
-		grunt.task.run('update_cloudformation');
+		grunt.task.run('_update_cloudformation');
 	});
 
-	grunt.registerTask('diff_template','Diff two CloudFormation templates',function(stack) {
+	grunt.registerTask('_diff_template','Diff two CloudFormation templates',function(stack) {
 		let last_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read(stack+'_last.template'),{schema: CLOUDFORMATION_SCHEMA })));
 		let current_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read('glycodomain.template'),{schema: CLOUDFORMATION_SCHEMA })));
 		let diff = require('rus-diff').rusDiff(last_data,current_data);
