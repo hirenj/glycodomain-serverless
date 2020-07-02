@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  parentstackName:
+    Type: String
+    Description: 'Parent stack name'
+Resources:
+  MonitorStack:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+
+      Description: 'Permissions to monitor installed stack'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudWatchRead
+            Effect: Allow
+            Action:
+              - 'cloudwatch:GetMetricData'
+              - 'cloudwatch:GetMetricStatistics'
+              - 'cloudwatch:GetMetricWidgetImage'
+              - 'cloudwatch:ListMetrics'
+            Resource:
+              - '*'
+          - Sid: LambdaRead1
+            Effect: Allow
+            Action:
+              - 'cloudformation:GetTemplate'
+              - 'cloudformation:DescribeStackResources'
+              - 'cloudformation:DescribeChangeSet'
+              - 'cloudformation:DescribeStacks'
+              - 'cloudformation:ListStackResources'
+              - 'lambda:GetAccountSettings'
+            Resource:
+              - '*'
+          - Sid: LambdaRead2
+            Effect: Allow
+            Action:
+              - 'lambda:List*'
+              - 'lambda:Get*'
+              - 'cloudformation:DescribeChangeSet'
+              - 'cloudformation:DescribeStacks'
+              - 'cloudformation:ListStackResources'
+              - 'lambda:GetAccountSettings'
+            Resource: !<!Sub> 'arn:aws:lambda:*:*:function:${parentstackName}-*'
+          - Sid: LogsRead0
+            Effect: Allow
+            Action: 
+              - 'logs:GetLogEvents'
+            Resource: 
+              - !<!Sub> "arn:aws:logs:*:*:log-group:/aws/lambda/${parentstackName}-*:log-stream:*"
+          - Sid: LogsRead1
+            Effect: Allow
+            Action: 
+              - 'logs:DescribeLogGroups'
+              - 'logs:DescribeQueryDefinitions'
+            Resource:
+              - "arn:aws:logs:*:*:log-group:*"
+          - Sid: LogsRead2
+            Effect: Allow
+            Action: 
+              - 'logs:ListTagsLogGroup'
+              - 'logs:DescribeLogStreams'
+              - 'logs:DescribeSubscriptionFilters'
+              - 'logs:StartQuery'
+              - 'logs:DescribeMetricFilters'
+              - 'logs:FilterLogEvents'
+              - 'logs:GetLogGroupFields'
+            Resource:
+              - !<!Sub> 'arn:aws:logs:*:*:log-group:/aws/lambda/${parentstackName}-*'
+          - Sid: LogsRead3
+            Effect: Allow
+            Action: 
+              - 'logs:DescribeQueries'
+              - 'logs:DescribeExportTasks'
+              - 'logs:GetLogRecord'
+              - 'logs:GetQueryResults'
+              - 'logs:StopQuery'
+              - 'logs:TestMetricFilter'
+              - 'logs:DescribeResourcePolicies'
+              - 'logs:GetLogDelivery'
+              - 'logs:DescribeDestinations'
+              - 'logs:ListLogDeliveries'
+            Resource: '*'
+Outputs: {}
