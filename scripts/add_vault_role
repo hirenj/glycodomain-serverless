@@ -46,7 +46,6 @@ def main():
       all_roles[line[0]] = [ convert_policy(policy,resource_data) for policy in line[1].split(',')]
 
   if wanted_role is not None:
-    sys.exit(1)
     policy_string = ','.join(all_roles[wanted_role])
     add_role = subprocess.run(["./scripts/setup_vault", "-r", region, f'gator-{stack}', wanted_role, policy_string ])
     if add_role.returncode == 0:

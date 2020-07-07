@@ -1,2 +1,3 @@
 CreateChangeSet	CreateChangeSetPermissions
 CopyDatasetsTestRun	CopyDatasetsTestRunReadOnlyPermissions,ReadConfig,policy/ReadOnlyDataBuilds,policy/CCGReadOnlyDatasets
+UpdateFunctions	UpdateFunctionsCodeAndConfiguration

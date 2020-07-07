@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters: {}
+Resources:
+  UpdateFunctionsCodeAndConfiguration:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: 'Permissions to update code for lambda functions'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: UpdateFunctions
+            Effect: Allow
+            Action:
+              - 'lambda:UpdateFunctionCode'
+              - 'lambda:GetFunctionConfiguration'
+              - 'lambda:UpdateFunctionConfiguration'
+            Resource:
+              - !<!Sub> 'arn:aws:lambda::${AWS::AccountId}:function:${parentstackName}-*'
+Outputs: {}
