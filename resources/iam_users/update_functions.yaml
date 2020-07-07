@@ -15,5 +15,5 @@ Resources:
               - 'lambda:GetFunctionConfiguration'
               - 'lambda:UpdateFunctionConfiguration'
             Resource:
-              - !<!Sub> 'arn:aws:lambda::${AWS::AccountId}:function:${parentstackName}-*'
+              - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${parentstackName}-*'
 Outputs: {}
