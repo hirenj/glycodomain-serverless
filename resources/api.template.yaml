@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Parameters: {}
+Parameters:
+    nodejsversion:
+      Type: String
+      Description: NodeJS Version
+      Default: nodejs12.x
 Resources:
   optionsStack:
     Type: AWS::CloudFormation::Stack
