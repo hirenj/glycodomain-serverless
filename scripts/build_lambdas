@@ -1,0 +1,11 @@
+#!/bin/sh
+
+output_dir="$PWD/dist/lambdas"
+
+mkdir -p "$output_dir"
+
+for module in $(python ./scripts/list_submodules.py); do
+	echo "Building for $module into $output_dir"
+	(cd $module; webpack-cli --output-path "$output_dir")
+	rm -rf "$PWD/dist/lambdas/js"
+done

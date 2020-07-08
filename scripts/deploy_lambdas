@@ -1,0 +1,14 @@
+#!/bin/sh
+
+stack="$1"
+
+echo "$stack"
+
+# if [[ ! -f "${stack}-resources.conf.json" ]]; then
+# 	grunt "get_resources:$stack"
+# fi
+
+
+for zipfile in dist/lambdas/*.zip; do
+	./node_modules/gator-webpack/scripts/deploy.sh $zipfile "${stack}-resources.conf.json"
+done
