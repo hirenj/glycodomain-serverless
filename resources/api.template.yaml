@@ -527,7 +527,7 @@ Resources:
           GRAPHQL_API: !GetAtt GraphQLApi.GraphQLUrl
       Handler: index.handler
       Role: !GetAtt 'LambdaAppSyncProxyRole.Arn'
-      Runtime: nodejs8.10
+      Runtime: !Ref nodejsversion
       MemorySize: 128
       Timeout: 10
   LambdaAppSyncProxyRole:
