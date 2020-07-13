@@ -1,5 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Parameters: {}
+Parameters:
+    rotateCertificates:
+      Type: String
+      Description: 'rotateCertificates'
 Resources:
   UpdateFunctionsCodeAndConfiguration:
     Type: AWS::IAM::ManagedPolicy
@@ -16,4 +19,18 @@ Resources:
               - 'lambda:UpdateFunctionConfiguration'
             Resource:
               - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${parentstackName}-*'
+          - Sid: GetStackResources
+            Effect: Allow
+            Action:
+              - 'cloudformation:ListStackResources'
+            Resource:
+              - !<!Sub> '${parentstack}'
+              - !<!Sub> '${AWS::StackId}'
+              - !<!Sub> '${optionsStack}'
+          - Sid: RunRotateCertificates
+            Effect: Allow
+            Action:
+              - 'lambda:InvokeFunction'
+            Resource:
+              - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${rotateCertificates}-*'
 Outputs: {}
