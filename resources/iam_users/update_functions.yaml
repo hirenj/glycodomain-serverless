@@ -33,4 +33,140 @@ Resources:
               - 'lambda:InvokeFunction'
             Resource:
               - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${rotateCertificates}-*'
+  updateFunctionResources:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: >
+          import boto3, tempfile, shutil, zipfile, urllib.request, json, os, datetime
+
+          def update_lambda(function,resources_file):
+            lambdac = boto3.client('lambda')
+            response = lambdac.get_function(FunctionName=function)
+            if 'Code' in response:
+              tempdir = tempfile.mkdtemp()
+              lambdapath = os.path.join(tempdir,'lambda.zip')
+              urllib.request.urlretrieve(response['Code']['Location'], lambdapath)
+              remove_from_zip(lambdapath,'resources.conf.json')
+              zip = zipfile.ZipFile(lambdapath,'a')
+              zip.write(resources_file,'resources.conf.json')
+              zip.close()
+
+              with open(lambdapath,'rb') as zipdata:
+                code = zipdata.read()
+                lambdac.update_function_code(FunctionName=function,ZipFile=code)
+
+          def remove_from_zip(zipfname, *filenames):
+            tempdir = tempfile.mkdtemp()
+            try:
+              tempname = os.path.join(tempdir, 'new.zip')
+              with zipfile.ZipFile(zipfname, 'r') as zipread:
+                with zipfile.ZipFile(tempname, 'w') as zipwrite:
+                  for item in zipread.infolist():
+                    if item.filename not in filenames:
+                      data = zipread.read(item.filename)
+                      zipwrite.writestr(item, data)
+              shutil.move(tempname, zipfname)
+            finally:
+              shutil.rmtree(tempdir)
+
+          def combine_resources(resources):
+            resource_keys = {
+              'AWS::Lambda::Function': 'functions',
+              'AWS::S3::Bucket' : 'buckets',
+              'AWS::DynamoDB::Table' : 'tables',
+              'AWS::StepFunctions::StateMachine' : 'stepfunctions',
+              'AWS::SQS::Queue' : 'queue',
+              'AWS::Events::Rule' : 'rule'
+            }
+            results = {
+              'functions' : {},
+              'buckets' : {},
+              'tables' : {},
+              'stepfunctions' : {},
+              'queue' : {},
+              'rule'  : {}
+            }
+
+            for resource in resources:
+              if resource['ResourceType'] in resource_keys:
+                wanted_key = resource_keys[ resource['ResourceType'] ]
+                results[wanted_key][ resource['LogicalResourceId'] ] = resource['PhysicalResourceId']
+
+            results['stack'] = os.environ['STACKNAME']
+            results['timestamp'] = datetime.datetime.now().isoformat()
+
+            return results
+
+          def retrieve_resources():
+            cloudformation = boto3.client('cloudformation')
+            next_token = None
+            resources = []
+            while len(resources) < 1 or next_token is not None:
+              if next_token is not None:
+                response = cloudformation.list_stack_resources(StackName='test', NextToken = next_token)
+                next_token = None
+              else:
+                response = cloudformation.list_stack_resources(StackName='test')
+              
+              resources = resources + response['StackResourceSummaries']
+              if 'NextToken' in response:
+                next_token = response['NextToken']
+
+            return resources
+
+          def handler(event, context):
+            resources = combine_resources(retrieve_resources())
+            print(json.dumps(resources))
+            tempdir = tempfile.mkdtemp()
+            resources_file = os.path.join(tempdir,'resources.conf.json')
+            with open(resources_file, 'w') as f:
+              json.dump(resources, f)
+            for func in resources['functions']:
+              update_lambda(resources['functions'][func], resources_file)
+            message = 'Completed'
+            return { 
+              'message' : message
+            }
+      Description: updateFunctionResources
+      Environment:
+        Variables:
+          STACKNAME: !<!Sub> '${parentstackName}'
+      Handler: index.handler
+      Role: !<!GetAtt> LambdaUpdateFunctionResourcesRole.Arn
+      Runtime: python3.7
+      MemorySize: 128
+      Timeout: 120
+  LambdaUpdateFunctionResourcesRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ReadWriteFunctions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: UpdateFunctions
+                Effect: Allow
+                Action:
+                  - 'lambda:UpdateFunctionCode'
+                  - 'lambda:GetFunction'
+                Resource:
+                  - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${parentstackName}-*'
+              - Sid: GetStackResources
+                Effect: Allow
+                Action:
+                  - 'cloudformation:ListStackResources'
+                Resource:
+                  - !<!Sub> '${parentstack}'
+                  - !<!Sub> '${AWS::StackId}'
+                  - !<!Sub> '${optionsStack}'
 Outputs: {}

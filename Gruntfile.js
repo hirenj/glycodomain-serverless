@@ -350,7 +350,7 @@ module.exports = function(grunt) {
 		var stack = grunt.option('stack');
 		var done = this.async();
 		var stackconfig = require('./'+stack+'-resources.conf.json');
-		if (grunt.option('generate-changeset')) {
+		if (grunt.option('generate-changeset') || grunt.option('force')) {
 			var template_body = grunt.file.read('glycodomain.template');
 			var template_obj = yaml.safeLoad(template_body,{schema: CLOUDFORMATION_SCHEMA });
 			var key = template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'_')+'.template';
