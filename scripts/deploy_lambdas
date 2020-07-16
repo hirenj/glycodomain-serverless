@@ -1,13 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 
 stack="$1"
+AWS_REGION=${AWS_REGION:-us-east-1}
+
 
 echo "$stack"
 
-# if [[ ! -f "${stack}-resources.conf.json" ]]; then
-# 	grunt "get_resources:$stack"
-# fi
-
+if [[ ! -f "${stack}-resources.conf.json" ]]; then
+	STACK="$stack" AWS_REGION="$AWS_REGION" ./node_modules/gator-webpack/scripts/deploy.sh --print-resources > "${stack}-resources.conf.json"
+fi
 
 for zipfile in dist/lambdas/*.zip; do
 	./node_modules/gator-webpack/scripts/deploy.sh $zipfile "${stack}-resources.conf.json"
