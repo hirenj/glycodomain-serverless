@@ -63,7 +63,7 @@ const onlyUnique = function(value, index, self) {
 
 const fill_parameters = function(template) {
   let current_params = Object.keys(template.Parameters || {});
-  let defined_resources = Object.keys(template.Resources || {});
+  let defined_resources = Object.keys(template.Resources || {}).concat( Object.keys(template.Conditions || {}) );
   let references = find_non_aws_refs(template.Resources);
   current_params.forEach(param => {
     if (defined_resources.indexOf(param) >= 0) {
@@ -183,6 +183,7 @@ const combine_resources = (curr,prev) => {
 
 const combine_stacks = (stack, sub_template) => {
   stack.Parameters = Object.assign(sub_template.Parameters || {},stack.Parameters);
+  stack.Conditions = Object.assign(sub_template.Conditions || {},stack.Conditions);
   stack.Resources = combine_resources(sub_template.Resources || {},stack.Resources);
   stack.Outputs = Object.assign(sub_template.Outputs || {},stack.Outputs);
 };

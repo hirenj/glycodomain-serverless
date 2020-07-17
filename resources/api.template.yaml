@@ -4,6 +4,23 @@ Parameters:
       Type: String
       Description: NodeJS Version
       Default: nodejs12.x
+    EnableTracing:
+      AllowedValues:
+        - true
+        - false
+      Type: String
+      Description: Enable tracing
+      Default: false
+    EnableKeepWarm:
+      AllowedValues:
+        - true
+        - false
+      Type: String
+      Description: Enable keeping functions warm
+      Default: false
+Conditions: 
+  tracing: !Equals [ !Ref EnableTracing, true ]
+  keepwarm: !Equals [ !Ref EnableKeepWarm, true ]
 Resources:
   optionsStack:
     Type: AWS::CloudFormation::Stack
@@ -901,6 +918,7 @@ Resources:
       StageName: api
       Description: Production Stage
       RestApiId: !Ref 'dataApi'
+      TracingEnabled: !If [tracing, 'true', 'false']
       DeploymentId: !Ref 'productionDeployment'
       Variables:
         Stack: !Ref 'AWS::StackName'
