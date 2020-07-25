@@ -65,6 +65,7 @@ Resources:
                   for item in zipread.infolist():
                     if item.filename not in filenames:
                       data = zipread.read(item.filename)
+                      item.external_attr = 0o664 << 16
                       zipwrite.writestr(item, data)
               shutil.move(tempname, zipfname)
             finally:
