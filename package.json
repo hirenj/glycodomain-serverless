@@ -35,15 +35,14 @@
   "devDependencies": {
     "aws-sdk": "^2.3.1",
     "gator-webpack" : "hirenj/gator-webpack",
+    "cfn-buildstack" : "hirenj/node-cfn-buildstack",
     "cloudformation-js-yaml-schema": "^0.4.2",
-    "glob": "^7.1.3",
     "grunt": "^0.4.5",
     "grunt-bumpup": "^0.6.3",
     "grunt-grunt": "^0.2.4",
     "grunt-tagrelease": "^0.3.3",
     "js-yaml": "^3.13.1",
     "load-grunt-tasks": "^3.4.1",
-    "rus-diff": "^1.1.0",
-    "yaml-include": "^1.2.0"
+    "rus-diff": "^1.1.0"
   }
 }

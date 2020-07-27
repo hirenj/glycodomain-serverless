@@ -8,7 +8,7 @@ var is_new_template = false;
 const yaml = require('js-yaml');
 const CLOUDFORMATION_SCHEMA = require('cloudformation-js-yaml-schema').CLOUDFORMATION_SCHEMA;
 
-
+const { createStacks } = require('cfn-buildstack');
 
 AWS.Request.prototype.promise = function() {
 	return new Promise(function(accept, reject) {
@@ -351,7 +351,7 @@ module.exports = function(grunt) {
 		var done = this.async();
 		var stackconfig = require('./'+stack+'-resources.conf.json');
 		if (grunt.option('generate-changeset') || grunt.option('force')) {
-			var template_body = grunt.file.read('glycodomain.template');
+			var template_body = grunt.file.read('Glycodomain.template');
 			var template_obj = yaml.safeLoad(template_body,{schema: CLOUDFORMATION_SCHEMA });
 			var key = template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'_')+'.template';
 			var sub_templates = Object.entries(template_obj.Resources).filter( ([key,res]) => { return res.Type == 'AWS::CloudFormation::Stack' } ).map( ([_,substack]) => { return { path: substack.Properties.TemplateURL.data.replace(/.*\//,'') } } );
@@ -388,7 +388,7 @@ module.exports = function(grunt) {
 
 	grunt.registerTask('_diff_template','Diff two CloudFormation templates',function(stack) {
 		let last_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read(stack+'_last.template'),{schema: CLOUDFORMATION_SCHEMA })));
-		let current_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read('glycodomain.template'),{schema: CLOUDFORMATION_SCHEMA })));
+		let current_data = JSON.parse(JSON.stringify(yaml.safeLoad(grunt.file.read('Glycodomain.template'),{schema: CLOUDFORMATION_SCHEMA })));
 		let diff = require('rus-diff').rusDiff(last_data,current_data);
 		if (Object.keys(diff).length !== 0) {
 			grunt.log.writeln(JSON.stringify(diff));
@@ -399,7 +399,7 @@ module.exports = function(grunt) {
 
 	grunt.registerTask('build_cloudformation', 'Build cloudformation template',function() {
 		var done = this.async();
-		require('./js/read_yaml').then( () => {
+		createStacks('Glycodomain').then( () => {
 			done();
 		});
 	});
