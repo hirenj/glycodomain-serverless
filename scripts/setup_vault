@@ -1,24 +1,20 @@
 #!/bin/bash
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
-while getopts "hcr:" opt; do
-  case ${opt} in
-	h )
-		echo "Usage:"
-		echo "  setup_vault -h                                                   Display this help message."
-		echo "  setup_vault -c creds.csv -r us-east-1 rolename policy_arn1,...   Create Role rolename"
+while getopts "hr:c:" opt; do
+  case $opt in
+	h)  echo "Usage:"
+		echo "  setup_vault -h                                                               Display this help message."
+		echo "  setup_vault -c creds.csv -r us-east-1 application rolename policy_arn1,...   Create Role rolename"
 		exit 0
 		;;
-	c )
-		credentials_file="$OPTARG"
+	c)  credentials_file="$OPTARG"
 		;;
-	r )
-		AWS_REGION="$OPTARG"
+	r)  AWS_REGION="$OPTARG"
 		;;
-	\? )
-	  echo "Invalid Option: -$OPTARG" 1>&2
-	  exit 1
-	  ;;
+	\?) echo "Invalid Option: -$OPTARG" 1>&2
+	    exit 1
+	    ;;
   esac
 done
 shift $((OPTIND -1))
