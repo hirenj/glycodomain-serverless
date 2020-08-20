@@ -1,6 +1,6 @@
 {
   "name": "glycodomain-serverless",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "description": "AWS / Lambda backed implementation of Glycodomain data API",
   "main": "index.js",
   "scripts": {
@@ -34,8 +34,8 @@
   "homepage": "https://github.com/hirenj/glycodomain-serverless",
   "devDependencies": {
     "aws-sdk": "^2.3.1",
-    "gator-webpack" : "hirenj/gator-webpack",
-    "cfn-buildstack" : "hirenj/node-cfn-buildstack",
+    "gator-webpack": "hirenj/gator-webpack",
+    "cfn-buildstack": "hirenj/node-cfn-buildstack",
     "cloudformation-js-yaml-schema": "^0.4.2",
     "grunt": "^0.4.5",
     "grunt-bumpup": "^0.6.3",
