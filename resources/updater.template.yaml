@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Parameters: {}
+Parameters:
+  codebucket:
+    Type: String
+    Description: Bucket that source code lives in
+    Default: 'glycodomain-code'
 Resources:
   codeupdates:
     Type: AWS::S3::Bucket

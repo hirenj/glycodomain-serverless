@@ -55,6 +55,14 @@ var read_stack_region = function(stack) {
 	});
 };
 
+var read_stack_parameters = function(stack) {
+	return cloudformation.describeStacks({'StackName' : stack}).promise()
+	.then(function(stack_info) {
+		return stack_info.data.Stacks[0].Parameters.reduce(  (params, {ParameterKey,ParameterValue}) => { params[ParameterKey] = ParameterValue; return params; }, {} );
+	});
+};
+
+
 var onlyUnique = function(value, index, self) {
 	return self.indexOf(value) === index;
 };
@@ -346,21 +354,34 @@ module.exports = function(grunt) {
 		grunt.task.run('_diff_template:'+stack);
 	});
 
-	grunt.registerTask('_update_cloudformation','',function() {
+	grunt.registerTask('_update_cloudformation','',async function() {
 		var stack = grunt.option('stack');
 		var done = this.async();
 		var stackconfig = require('./'+stack+'-resources.conf.json');
+		let stack_params = await read_stack_parameters(stack);
+		var codebucket = stack_params.codebucket;
+		if (stackconfig.buckets.codeupdates) {
+			codebucket = stackconfig.buckets.codeupdates;
+		}
 		if (grunt.option('generate-changeset') || grunt.option('force')) {
 			var template_body = grunt.file.read('Glycodomain.template');
 			var template_obj = yaml.safeLoad(template_body,{schema: CLOUDFORMATION_SCHEMA });
 			var key = template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'_')+'.template';
 			var sub_templates = Object.entries(template_obj.Resources).filter( ([key,res]) => { return res.Type == 'AWS::CloudFormation::Stack' } ).map( ([_,substack]) => { return { path: substack.Properties.TemplateURL.data.replace(/.*\//,'') } } );
-			put_templates( stackconfig.buckets.codeupdates, [{ body: template_body, key }].concat(sub_templates) ).then(() => {
+			put_templates( codebucket , [{ body: template_body, key }].concat(sub_templates) ).then(() => {
 				console.log("Created template on S3, initiating changeset");
 				var params_options = Object.keys(template_obj.Parameters).
 					filter( param_name => (grunt.option('new-parameters') || []).indexOf(param_name) < 0 ).
 					map( param_name => { return { ParameterKey: param_name, UsePreviousValue: true }; });
-				return cloudformation.createChangeSet({ChangeSetName: stack+'-'+template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'-'), Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+stackconfig.buckets.codeupdates+'/templates/'+key }).promise().then((response) => {
+				let param_codebucket = params_options.filter( param => param.ParameterKey == 'codebucket')[0];
+				if (param_codebucket) {
+					param_codebucket.UsePreviousValue = false;
+					param_codebucket.ParameterValue = codebucket;
+				} else {
+					params_options.push( { ParameterKey: 'codebucket', ParameterValue: codebucket  });
+				}
+				console.log('Using parameters',params_options);
+				return cloudformation.createChangeSet({ChangeSetName: stack+'-'+template_obj.Description.replace(/[^A-Za-z0-9_\-]/g,'-'), Capabilities: ['CAPABILITY_NAMED_IAM'], StackName: stack, Parameters: params_options, TemplateURL: 'https://s3.amazonaws.com/'+codebucket+'/templates/'+key }).promise().then((response) => {
 					console.log(response.data);
 				});
 			}).catch((err) => {
