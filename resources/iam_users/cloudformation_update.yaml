@@ -24,6 +24,7 @@ Resources:
               - 's3:GetObject'
             Resource:
               - !<!Sub> 'arn:aws:s3:::${codeupdates}/templates/*'
+              - !<!Sub> 'arn:aws:s3:::${codeupdates}/lambdas/*'
           - Sid: CloudFormation
             Effect: Allow
             Action:

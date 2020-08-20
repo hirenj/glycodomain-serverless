@@ -1,0 +1,15 @@
+#!/bin/bash
+
+outputdir="dist"
+
+rm -rf "$outputdir"
+mkdir -p "$outputdir/lambdas"
+mkdir -p "$outputdir/templates"
+
+./scripts/build_lambdas
+
+main_template_file=$(./node_modules/.bin/createstack --name Glycodomain --outputdir "$outputdir/templates" --lambdasdir "$outputdir/lambdas/")
+
+echo "Successfully built $main_template_file"
+
+# aws s3 cp dist s3://test-codeupdates-7l9brz1qs0jz/ --recursive
