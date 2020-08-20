@@ -252,35 +252,6 @@ module.exports = function(grunt) {
 		});
 	});
 
-
-	grunt.registerTask('_uploadlambda', function(dir) {
-		var done = this.async();
-
-		grunt.log.writeln('processing ' + dir);
-
-		grunt.util.spawn({
-			grunt: true,
-			args:['deploy'],
-			opts: {
-				cwd: dir
-			}
-		},
-
-		function(err, result, code) {
-			if (err == null) {
-				grunt.log.writeln('Uploaded ' + dir);
-				grunt.log.writeln(result.stdout);
-				done();
-			}
-			else {
-				grunt.log.writeln('Uploading ' + dir + ' failed: ' + code);
-				grunt.log.writeln(result.stdout);
-				done(false);
-			}
-		})
-	});
-
-
 	grunt.registerTask('get_resources', 'Get CloudFormation resources', function(stack) {
 		var done = this.async();
 		stack = stack || 'test';
@@ -308,35 +279,9 @@ module.exports = function(grunt) {
 		});
 	});
 
-	grunt.registerTask('copy_configs', 'Copy master lambda conf to target lambdas', function(stack) {
-		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
-			return dep.indexOf('lambda') >= 0;
-		}).map( dep => `node_modules/${dep}`);
-		lambda_modules.forEach(function(module) {
-			grunt.file.copy(stack+'-resources.conf.json',module+'/resources.conf.json');
-		});
-	});
 
-	grunt.registerTask('_upload_lambdas', 'Upload lambdas only', function(stack) {
-		if (grunt.option('generate-changeset')) {
-			return;
-		}
-		let lambda_modules = Object.keys(grunt.file.readJSON('package.json').dependencies).filter( dep => {
-			return dep.indexOf('lambda') >= 0;
-		}).map( dep => `node_modules/${dep}`);
-		lambda_modules.forEach(function(module) {
-			grunt.task.run('_uploadlambda:'+module);
-		});
-	});
-
-	grunt.registerTask('update_configs','Retrieve resources and set config files in place in the lambdas', function(stack) {
-		grunt.task.run('get_resources:'+stack);
-		grunt.task.run('copy_configs:'+stack);
-	});
-
-	grunt.registerTask('deploy_lambdas', 'Retrieve resources, copy configs and deploy to AWS', function(stack) {
-		grunt.task.run('update_configs:'+stack);
-		grunt.task.run('_upload_lambdas:'+stack);
+	grunt.registerTask('update_lambdas', 'Retrieve resources, copy configs and deploy to AWS', function(stack) {
+		console.log(`(MAKE SURE AWS INSTALLED) node_docker ./scripts/build_lambdas && ./scripts/deploy_lambdas ${stack}`);
 	});
 
 	grunt.registerTask('_get_current_template','Get cloudformation template',function(stack) {
@@ -400,7 +345,7 @@ module.exports = function(grunt) {
 		}
 	});
 
-	grunt.registerTask('deploy_stack','Deploy CloudFormation to a stack',function(stack) {
+	grunt.registerTask('update_stack','Deploy CloudFormation by updating a stack',function(stack) {
 		grunt.option('stack',stack);
 		grunt.task.run('build_cloudformation');
 		grunt.task.run('compare_templates:'+stack);
@@ -426,7 +371,7 @@ module.exports = function(grunt) {
 		});
 	});
 
-	grunt.registerTask('deploy','Deploy software to AWS',function(stack) {
-		grunt.task.run(['deploy_stack:'+stack,'deploy_lambdas:'+stack]);
+	grunt.registerTask('deploy_update','Deploy software to AWS updating a stack',function(stack) {
+		grunt.task.run(['update_stack:'+stack,'update_lambdas:'+stack]);
 	});
 };
