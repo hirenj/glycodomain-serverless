@@ -105,10 +105,10 @@ Resources:
             resources = []
             while len(resources) < 1 or next_token is not None:
               if next_token is not None:
-                response = cloudformation.list_stack_resources(StackName='test', NextToken = next_token)
+                response = cloudformation.list_stack_resources(StackName=os.environ['STACKNAME'], NextToken = next_token)
                 next_token = None
               else:
-                response = cloudformation.list_stack_resources(StackName='test')
+                response = cloudformation.list_stack_resources(StackName=os.environ['STACKNAME'])
               
               resources = resources + response['StackResourceSummaries']
               if 'NextToken' in response:
