@@ -17,6 +17,11 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  - 's3:GetObject'
+                Resource:
+                  - !<!Sub> 'arn:aws:s3:::${dataBucket}/conf/resources.conf.json'
+              - Effect: Allow
+                Action:
                   - 'iam:CreateAccessKey'
                   - 'iam:CreateUser'
                   - 'iam:DeleteAccessKey'
