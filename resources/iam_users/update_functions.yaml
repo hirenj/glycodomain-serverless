@@ -35,7 +35,7 @@ Resources:
             Action:
               - 'lambda:InvokeFunction'
             Resource:
-              - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${rotateCertificates}-*'
+              - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${rotateCertificates}'
   updateFunctionResources:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -206,4 +206,67 @@ Resources:
                   - !<!Sub> '${parentstack}'
                   - !<!Sub> '${AWS::StackId}'
                   - !<!Sub> '${optionsStack}'
+  LambdaPostUpdateFunctionsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: AllowLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: RegisterEvents
+                Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource:
+                  - !<!GetAtt> updateFunctionResources.Arn
+                  - !<!Sub> 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${rotateCertificates}'
+  PostInstallTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      DisplayName: Post install
+      Subscription:
+        - Endpoint: !<!GetAtt> postUpdateFunctions.Arn
+          Protocol: lambda
+  CopyDatasetsConfChangesPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !<!GetAtt> postUpdateFunctions.Arn
+      Principal: sns.amazonaws.com
+      SourceArn: !<!Ref> PostInstallTopic
+  postUpdateFunctions:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: >
+          import boto3,os
+
+          def handler(event, context):
+            lambdac = boto3.client('lambda')
+            lambdac.invoke( FunctionName = os.environ['UPDATEFUNCTIONS'], InvocationType='RequestResponse', Payload='{}' )
+            lambdac.invoke( FunctionName = os.environ['ROTATECERTIFICATES'], InvocationType='RequestResponse', Payload='{}' )
+            message = 'Completed'
+            return { 
+              'message' : message
+            }
+      Description: startPostUpdateFunctions
+      Environment:
+        Variables:
+          UPDATEFUNCTIONS: !<!GetAtt> updateFunctionResources.Arn
+          ROTATECERTIFICATES: !<!Sub> '${rotateCertificates}'
+      Handler: index.handler
+      Role: !<!GetAtt> LambdaPostUpdateFunctionsRole.Arn
+      Runtime: python3.7
+      MemorySize: 128
+      Timeout: 300
 Outputs: {}
