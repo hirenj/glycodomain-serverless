@@ -805,7 +805,7 @@ Resources:
             ResponseTemplates:
               application/json: |-
                 #set($lines = $input.body.split('\n'))
-                #set($header = $lines.get(0).replaceAll('>[a-zA-Z\|0-9_]+ ','').replaceAll('"',''))
+                #set($header = $lines.get(0).replaceAll('>[a-zA-Z\|0-9_]+ ','').replaceAll('"','').replaceAll('\\','\\\\'))
                 #set($empty = $!lines.set(0,''))
                 #set($quote = '"')
                 {"data":[$quote#foreach($line in $lines)$line.replace('
